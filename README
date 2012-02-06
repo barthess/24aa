@@ -7,8 +7,8 @@ EEPROM like a regular file.
 
 2. LIMITATIONS
 
-* Only one EEPROM IC
-* Maximum capacity of EEPROM is 65536 bytes due to 16bit addressing
+* Only one EEPROM IC.
+* Maximum capacity of EEPROM is 65536 bytes.
 
 All limits can be easily expanded. 
 
