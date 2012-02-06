@@ -1,0 +1,38 @@
+Abstraction layer to EEPROM ICs like 24AA/24LC.
+
+1. DESCRIPTION
+
+This library designed to work on top of ChibiOS/RT. It abstracts access to
+EEPROM like a regular file.
+
+2. LIMITATIONS
+
+* Only one EEPROM IC
+* Maximum capacity of EEPROM is 65536 bytes due to 16bit addressing
+
+All limits can be easily expanded. 
+
+For a moment it supports only I2C interfaced chips and tested with my 24LC512.
+Support of SPI chips (25AA/25LC) can be easily added too.
+
+3. USAGE
+
+* Include eeprom.h file to your project
+* Define file object of a EepromFileStream type
+* Open it with EepromOpen() function
+
+Now you can access to EEPROM array like to a regular file with functions:
+- chFileStreamRead()
+- chFileStreamWrite()
+- chFileStreamGetPosition()
+- chFileStreamSeek()
+etc. 
+
+Examples of usage and checking the returning parameter you can found in
+eeprom_testsuit.c
+
+
+
+Author: Uladzimir Pylinski aka barthess (barthess@yandex.ru). 
+06.02.2012
+
