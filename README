@@ -17,9 +17,10 @@ Support of SPI chips (25AA/25LC) can be easily added too.
 
 3. USAGE
 
-* Include eeprom.h file to your project
-* Define file object of a EepromFileStream type
-* Open it with EepromOpen() function
+* Open 24aa.h and tune constants for you needs.
+* Include eeprom.h file to your project.
+* Define file object of a EepromFileStream type.
+* Open it with EepromOpen() function.
 
 Now you can access to EEPROM array like to a regular file with functions:
 - chFileStreamRead()
