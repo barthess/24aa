@@ -7,7 +7,7 @@ The work is provided "as is" without warranty of any kind, neither express nor i
 /*****************************************************************************
  * DATASHEET NOTES
  *****************************************************************************
-Write cycle time (byte or page) — 5 ms
+Write cycle time (byte or page) â€” 5 ms
 
 Note:
 Page write operations are limited to writing
@@ -16,8 +16,8 @@ regardless of the number of bytes
 actually being written. Physical page
 boundaries start at addresses that are
 integer multiples of the page buffer size (or
-‘page size’) and end at addresses that are
-integer multiples of [page size – 1]. If a
+â€˜page sizeâ€™) and end at addresses that are
+integer multiples of [page size â€“ 1]. If a
 Page Write command attempts to write
 across a physical page boundary, the
 result is that the data wraps around to the
