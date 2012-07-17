@@ -13,6 +13,12 @@ The work is provided "as is" without warranty of any kind, neither express nor i
 /* total amount of memory in bytes */
 #define EEPROM_SIZE       65536
 
+/* ChibiOS I2C driver used to communicat with EEPROM */
+#define EEPROM_I2CD       I2CD2
+
+/* EEPROM address on bus */
+#define EEPROM_I2C_ADDR   0b1010000
+
 /* time to write one page in mS. Consult datasheet! */
 #define EEPROM_WRITE_TIME 10
 
