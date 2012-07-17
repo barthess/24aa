@@ -55,7 +55,9 @@ expected.
  ******************************************************************************
  */
 /* semaphore for mutual access to EEPROM IC */
+#if EEPROM_USE_MUTUAL_EXCLUSION
 static BinarySemaphore eeprom_sem;
+#endif
 
 /* temporal local buffer */
 static uint8_t localtxbuf[EEPROM_TX_DEPTH];
@@ -105,7 +107,9 @@ msg_t eeprom_read(uint32_t offset, uint8_t *buf, size_t len){
   msg_t status = RDY_OK;
   systime_t tmo = calc_timeout(&EEPROM_I2CD, 2, len);
 
+#if EEPROM_USE_MUTUAL_EXCLUSION
   chBSemWait(&eeprom_sem);
+#endif
 
   chDbgCheck(((len <= EEPROM_SIZE) && ((offset+len) <= EEPROM_SIZE)),
              "requested data out of device bounds");
@@ -116,7 +120,10 @@ msg_t eeprom_read(uint32_t offset, uint8_t *buf, size_t len){
                                     localtxbuf, 2, buf, len, tmo);
   i2cReleaseBus(&EEPROM_I2CD);
 
+#if EEPROM_USE_MUTUAL_EXCLUSION
   chBSemSignal(&eeprom_sem);
+#endif
+
   return status;
 }
 
@@ -133,7 +140,9 @@ msg_t eeprom_write(uint32_t offset, const uint8_t *buf, size_t len){
   msg_t status = RDY_OK;
   systime_t tmo = calc_timeout(&EEPROM_I2CD, (len + 2), 0);
 
+#if EEPROM_USE_MUTUAL_EXCLUSION
   chBSemWait(&eeprom_sem);
+#endif
 
   chDbgCheck(((len <= EEPROM_SIZE) && ((offset+len) <= EEPROM_SIZE)),
              "data can not be fitted in device");
@@ -142,7 +151,7 @@ msg_t eeprom_write(uint32_t offset, const uint8_t *buf, size_t len){
              "data can not be fitted in single page");
 
   eeprom_split_addr(localtxbuf, offset);              /* write address bytes */
-  memcpy(&(localtxbuf[2]), buf, len);               /* write data bytes */
+  memcpy(&(localtxbuf[2]), buf, len);                 /* write data bytes */
 
   i2cAcquireBus(&EEPROM_I2CD);
   status = i2cMasterTransmitTimeout(&EEPROM_I2CD, EEPROM_I2C_ADDR,
@@ -151,7 +160,9 @@ msg_t eeprom_write(uint32_t offset, const uint8_t *buf, size_t len){
 
   /* wait until EEPROM process data */
   chThdSleepMilliseconds(EEPROM_WRITE_TIME);
+#if EEPROM_USE_MUTUAL_EXCLUSION
   chBSemSignal(&eeprom_sem);
+#endif
   return status;
 }
 
@@ -163,7 +174,9 @@ void init_eepromio(void){
   /* clear bufer just to be safe. */
   memset(localtxbuf, 0x55, EEPROM_TX_DEPTH);
 
+#if EEPROM_USE_MUTUAL_EXCLUSION
   chBSemInit(&eeprom_sem, FALSE);
+#endif
 }
 
 
