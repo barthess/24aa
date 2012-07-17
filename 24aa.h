@@ -26,8 +26,8 @@ The work is provided "as is" without warranty of any kind, neither express nor i
 #define EEPROM_TX_DEPTH (EEPROM_PAGE_SIZE + 2)
 
 void init_eepromio(void);
-msg_t eeprom_read(uint32_t addr, uint8_t *rxbuf, size_t len);
-msg_t eeprom_write(uint32_t addr, const uint8_t *buf, size_t len);
+msg_t eeprom_read(uint32_t offset, uint8_t *rxbuf, size_t len);
+msg_t eeprom_write(uint32_t offset, const uint8_t *buf, size_t len);
 
 #endif /* _24AA_H_ */
 
