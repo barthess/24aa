@@ -14,7 +14,7 @@ The work is provided "as is" without warranty of any kind, neither express nor i
 #define EEPROM_SIZE       65536
 
 /* time to write one page in mS. Consult datasheet! */
-#define EEPROM_WRITE_TIME 10
+#define EEPROM_WRITE_TIME 5
 
 /* temporal transmit buffer depth for eeprom driver */
 #define EEPROM_TX_DEPTH (EEPROM_PAGE_SIZE + 2)
