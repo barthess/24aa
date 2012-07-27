@@ -33,9 +33,6 @@ expected.
 #include "hal.h"
 
 #include "24aa.h"
-#include "message.h"
-#include "i2c_local.h"
-#include "main.h"
 
 /*
  ******************************************************************************
