@@ -90,7 +90,7 @@ static uint8_t localtxbuf[EEPROM_TX_DEPTH];
 static systime_t calc_timeout(I2CDriver *i2cp, size_t txbytes, size_t rxbytes){
   const uint32_t bitsinbyte = 10;
   uint32_t tmo;
-  tmo = ((txbytes + rxbytes + 1) * bitsinbyte * 1000);
+  tmo = ((txbytes + rxbytes + 1) * bitsinbyte * CH_FREQUENCY);
   tmo /= i2cp->config->clock_speed;
   tmo += 5; /* some additional time to be safer */
   return MS2ST(tmo);
