@@ -87,9 +87,9 @@ static uint8_t localtxbuf[EEPROM_TX_DEPTH];
 static systime_t calc_timeout(I2CDriver *i2cp, size_t txbytes, size_t rxbytes){
   const uint32_t bitsinbyte = 10;
   uint32_t tmo;
-  tmo = ((txbytes + rxbytes + 1) * bitsinbyte * CH_FREQUENCY);
+  tmo = ((txbytes + rxbytes + 1) * bitsinbyte * 1000);
   tmo /= i2cp->config->clock_speed;
-  tmo += 5; /* some additional time to be safer */
+  tmo += 10; /* some additional milliseconds to be safer */
   return MS2ST(tmo);
 }
 
@@ -97,8 +97,8 @@ static systime_t calc_timeout(I2CDriver *i2cp, size_t txbytes, size_t rxbytes){
  * @brief   EEPROM read routine.
  *
  * @param[in] offset    addres of 1-st byte to be read
- * @param[in] len       number of bytes to be write
- * @param[in] ext_rxbuf pointer to data buffer
+ * @param[in] buf       pointer to data buffer
+ * @param[in] len       number of bytes to be red
  */
 msg_t eeprom_read(uint32_t offset, uint8_t *buf, size_t len){
   msg_t status = RDY_OK;
