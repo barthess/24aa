@@ -112,10 +112,14 @@ msg_t eeprom_read(uint32_t offset, uint8_t *buf, size_t len){
              "requested data out of device bounds");
 
   eeprom_split_addr(localtxbuf, offset);                /* write address bytes */
+#if I2C_USE_MUTUAL_EXCLUSION
   i2cAcquireBus(&EEPROM_I2CD);
+#endif
   status = i2cMasterTransmitTimeout(&EEPROM_I2CD, EEPROM_I2C_ADDR,
                                     localtxbuf, 2, buf, len, tmo);
+#if I2C_USE_MUTUAL_EXCLUSION
   i2cReleaseBus(&EEPROM_I2CD);
+#endif
 
 #if EEPROM_USE_MUTUAL_EXCLUSION
   chBSemSignal(&eeprom_sem);
@@ -150,10 +154,14 @@ msg_t eeprom_write(uint32_t offset, const uint8_t *buf, size_t len){
   eeprom_split_addr(localtxbuf, offset);              /* write address bytes */
   memcpy(&(localtxbuf[2]), buf, len);                 /* write data bytes */
 
+#if I2C_USE_MUTUAL_EXCLUSION
   i2cAcquireBus(&EEPROM_I2CD);
+#endif
   status = i2cMasterTransmitTimeout(&EEPROM_I2CD, EEPROM_I2C_ADDR,
                                     localtxbuf, (len + 2), NULL, 0, tmo);
+#if I2C_USE_MUTUAL_EXCLUSION
   i2cReleaseBus(&EEPROM_I2CD);
+#endif
 
   /* wait until EEPROM process data */
   chThdSleepMilliseconds(EEPROM_WRITE_TIME);
@@ -168,12 +176,16 @@ msg_t eeprom_write(uint32_t offset, const uint8_t *buf, size_t len){
  */
 void init_eepromio(void){
 
+#if CH_DBG_ENABLE_ASSERTS
   /* clear bufer just to be safe. */
   memset(localtxbuf, 0x55, EEPROM_TX_DEPTH);
+#endif
 
 #if EEPROM_USE_MUTUAL_EXCLUSION
   chBSemInit(&eeprom_sem, FALSE);
 #endif
+
+  return;
 }
 
 

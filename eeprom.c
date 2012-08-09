@@ -166,7 +166,7 @@ static size_t read(void *ip, uint8_t *bp, size_t n){
   if (n == 0)
     return 0;
 
-  /* Stupid STM32F1x I2C cell does not allow to read less than 2 bytes.
+  /* Stupid I2C cell in STM32F1x does not allow to read single byte.
      So we must read 2 bytes and return needed one. */
 #if defined(STM32F1XX)
   if (n == 1){
