@@ -168,7 +168,7 @@ static size_t read(void *ip, uint8_t *bp, size_t n){
 
   /* Stupid I2C cell in STM32F1x does not allow to read single byte.
      So we must read 2 bytes and return needed one. */
-#if defined(STM32F1XX)
+#if defined(STM32F1XX_I2C)
   if (n == 1){
     uint8_t __buf[2];
     /* if NOT last byte of file requested */
@@ -192,7 +192,7 @@ static size_t read(void *ip, uint8_t *bp, size_t n){
         return 0;
     }
   }
-#endif
+#endif /* defined(STM32F1XX_I2C) */
 
   /* call low level function */
   status  = eeprom_read(getposition(ip), bp, n);
