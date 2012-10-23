@@ -123,9 +123,10 @@ static size_t write(void *ip, const uint8_t *bp, size_t n){
   chDbgCheck((ip != NULL) && (((EepromFileStream*)ip)->vmt != NULL), "");
 
   pagesize   = ((EepromFileStream*)ip)->cfg->pagesize;
-  firstpage  = ((EepromFileStream*)ip)->cfg->barrier_low;
+  firstpage  = ((EepromFileStream*)ip)->cfg->barrier_low / pagesize;
+  lastpage   = firstpage;
+
   firstpage += getposition(ip) / pagesize;
-  lastpage   = ((EepromFileStream*)ip)->cfg->barrier_low;
   lastpage  += (getposition(ip) + n - 1) / pagesize;
 
   if (n == 0)
@@ -145,7 +146,8 @@ static size_t write(void *ip, const uint8_t *bp, size_t n){
 
   else{
     /* write first piece of data to first page boundary */
-    len = ((firstpage + 1) * pagesize) - getposition(ip);
+    len =  ((firstpage + 1) * pagesize) - getposition(ip);
+    len -= ((EepromFileStream*)ip)->cfg->barrier_low;
     __fitted_write(ip, bp, len, &written);
     bp += len;
 

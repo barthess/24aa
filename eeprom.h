@@ -36,7 +36,7 @@ typedef struct I2CEepromFileConfig {
   /**
    * Address of IC on I2C bus.
    */
-  i2caddr_t   address;
+  i2caddr_t   addr;
   /**
    * Time needed by IC for single page writing.
    * Check datasheet!!!

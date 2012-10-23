@@ -101,13 +101,13 @@ static msg_t eeprom_read(const I2CEepromFileConfig *i2efcp,
   chDbgCheck(((len <= i2efcp->size) && ((offset+len) <= i2efcp->size)),
              "out of device bounds");
 
-  eeprom_split_addr(i2efcp->write_buf, offset);
+  eeprom_split_addr(i2efcp->write_buf, (offset + i2efcp->barrier_low));
 
   #if I2C_USE_MUTUAL_EXCLUSION
   i2cAcquireBus(i2efcp->i2cp);
   #endif
 
-  status = i2cMasterTransmitTimeout(i2efcp->i2cp, i2efcp->address,
+  status = i2cMasterTransmitTimeout(i2efcp->i2cp, i2efcp->addr,
                                     i2efcp->write_buf, 2, data, len, tmo);
 
   #if I2C_USE_MUTUAL_EXCLUSION
@@ -137,14 +137,16 @@ static msg_t eeprom_write(const I2CEepromFileConfig *i2efcp, uint32_t offset,
   chDbgCheck(((offset / i2efcp->pagesize) == ((offset + len - 1) / i2efcp->pagesize)),
              "data can not be fitted in single page");
 
-  eeprom_split_addr(i2efcp->write_buf, offset);       /* write address bytes */
-  memcpy(&(i2efcp->write_buf[2]), data, len);         /* write data bytes */
+  /* write address bytes */
+  eeprom_split_addr(i2efcp->write_buf, (offset + i2efcp->barrier_low));
+  /* write data bytes */
+  memcpy(&(i2efcp->write_buf[2]), data, len);
 
   #if I2C_USE_MUTUAL_EXCLUSION
   i2cAcquireBus(i2efcp->i2cp);
   #endif
 
-  status = i2cMasterTransmitTimeout(i2efcp->i2cp, i2efcp->address,
+  status = i2cMasterTransmitTimeout(i2efcp->i2cp, i2efcp->addr,
                                     i2efcp->write_buf, (len + 2), NULL, 0, tmo);
 
   #if I2C_USE_MUTUAL_EXCLUSION
