@@ -97,6 +97,10 @@ static msg_t eeprom_read(const I2CEepromFileConfig *i2efcp,
 
   msg_t status = RDY_RESET;
   systime_t tmo = calc_timeout(i2efcp->i2cp, 2, len);
+
+  chDbgCheck(((len <= i2efcp->size) && ((offset+len) <= i2efcp->size)),
+             "out of device bounds");
+
   eeprom_split_addr(i2efcp->write_buf, offset);
 
   #if I2C_USE_MUTUAL_EXCLUSION
@@ -127,6 +131,11 @@ static msg_t eeprom_write(const I2CEepromFileConfig *i2efcp, uint32_t offset,
                           const uint8_t *data, size_t len){
   msg_t status = RDY_RESET;
   systime_t tmo = calc_timeout(i2efcp->i2cp, (len + 2), 0);
+
+  chDbgCheck(((len <= i2efcp->size) && ((offset+len) <= i2efcp->size)),
+             "out of device bounds");
+  chDbgCheck(((offset / i2efcp->pagesize) == ((offset + len - 1) / i2efcp->pagesize)),
+             "data can not be fitted in single page");
 
   eeprom_split_addr(i2efcp->write_buf, offset);       /* write address bytes */
   memcpy(&(i2efcp->write_buf[2]), data, len);         /* write data bytes */
