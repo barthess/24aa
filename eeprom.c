@@ -7,8 +7,9 @@ The work is provided "as is" without warranty of any kind, neither express nor i
 #include "ch.h"
 #include "hal.h"
 
-#include "24aa.h"
 #include "eeprom.h"
+
+#include "24aa.c"
 
 /*
  ******************************************************************************
@@ -23,8 +24,8 @@ The work is provided "as is" without warranty of any kind, neither express nor i
  */
 
 static fileoffset_t getsize(void *ip){
-  chDbgCheck((ip != NULL) && (((EepromFileStream*)ip)->vmt != NULL), "");
-  return EEPROM_SIZE;
+  chDbgCheck((ip != NULL) && (((EepromFileStream*)ip)->vmt != NULL) && (((EepromFileStream*)ip)->cfg != NULL), "");
+  return ((EepromFileStream*)ip)->cfg->barrier_hi - ((EepromFileStream*)ip)->cfg->barrier_low;
 }
 
 static fileoffset_t getposition(void *ip){
@@ -34,49 +35,31 @@ static fileoffset_t getposition(void *ip){
 
 static fileoffset_t lseek(void *ip, fileoffset_t offset){
   chDbgCheck((ip != NULL) && (((EepromFileStream*)ip)->vmt != NULL), "");
-  if (offset > EEPROM_SIZE)
-    offset = EEPROM_SIZE;
+  uint32_t size = getsize(ip);
+  if (((EepromFileStream*)ip)->cfg->ring){
+    /* wrap pointer if need */
+    offset = offset % size;
+  }
+  else{
+    if (offset > size)
+      offset = size;
+  }
   ((EepromFileStream*)ip)->position = offset;
-  return FILE_OK;
+  return offset;
 }
 
 static uint32_t close(void *ip) {
   chDbgCheck((ip != NULL) && (((EepromFileStream*)ip)->vmt != NULL), "");
-  ((EepromFileStream*)ip)->errors = FILE_OK;
+  ((EepromFileStream*)ip)->errors   = FILE_OK;
   ((EepromFileStream*)ip)->position = 0;
-  ((EepromFileStream*)ip)->vmt = NULL;
+  ((EepromFileStream*)ip)->vmt      = NULL;
+  ((EepromFileStream*)ip)->cfg      = NULL;
   return FILE_OK;
 }
 
 static int geterror(void *ip){
   chDbgCheck((ip != NULL) && (((EepromFileStream*)ip)->vmt != NULL), "");
   return ((EepromFileStream*)ip)->errors;
-}
-
-/**
- * @brief   Determines and returns size of data that can be processed
- */
-static size_t __clamp_size(void *ip, size_t n){
-  if (n > getsize(ip))
-    return 0;
-  else if ((getposition(ip) + n) > getsize(ip))
-    return getsize(ip) - getposition(ip);
-  else
-    return n;
-}
-
-/**
- * @brief     Macro helper.
- */
-#define __fitted_write(){                                                     \
-  status  = eeprom_write(getposition(ip), bp, len);                           \
-  if (status != RDY_OK)                                                       \
-    return written;                                                           \
-  else{                                                                       \
-    written += len;                                                           \
-    bp += len;                                                                \
-    lseek(ip, getposition(ip) + len);                                         \
-  }                                                                           \
 }
 
 /**
@@ -97,6 +80,32 @@ static msg_t get(void *ip){
 }
 
 /**
+ * @brief   Determines and returns size of data that can be processed
+ */
+static size_t __clamp_size(void *ip, size_t n){
+  if (((EepromFileStream*)ip)->cfg->ring)
+    return n; /* unlimited file */
+
+  if ((getposition(ip) + n) > getsize(ip))
+    return getsize(ip) - getposition(ip);
+  else
+    return n;
+}
+
+/**
+ * @brief   Write data that can be fitted in one page boundary
+ */
+static void __fitted_write(void *ip, const uint8_t *data, size_t len, uint32_t *written){
+  msg_t status = RDY_RESET;
+
+  status  = eeprom_write(((EepromFileStream*)ip)->cfg, getposition(ip), data, len);
+  if (status == RDY_OK){
+    *written += len;
+    lseek(ip, getposition(ip) + len);
+  }
+}
+
+/**
  * @brief     Write data to EEPROM.
  * @details   Only one EEPROM page can be written at once. So fucntion
  *            splits large data chunks in small EEPROM transactions if needed.
@@ -104,14 +113,20 @@ static msg_t get(void *ip){
  *            aligned to EEPROM page boundaries.
  */
 static size_t write(void *ip, const uint8_t *bp, size_t n){
-  msg_t status = RDY_OK;
 
   size_t   len = 0;     /* bytes to be written at one trasaction */
   uint32_t written = 0; /* total bytes successfully written */
-  uint32_t firstpage = getposition(ip) / EEPROM_PAGE_SIZE;
-  uint32_t lastpage  = (getposition(ip) + n - 1) / EEPROM_PAGE_SIZE;
+  uint16_t pagesize;
+  uint32_t firstpage;
+  uint32_t lastpage;
 
   chDbgCheck((ip != NULL) && (((EepromFileStream*)ip)->vmt != NULL), "");
+
+  pagesize   = ((EepromFileStream*)ip)->cfg->pagesize;
+  firstpage  = ((EepromFileStream*)ip)->cfg->barrier_low;
+  firstpage += getposition(ip) / pagesize;
+  lastpage   = ((EepromFileStream*)ip)->cfg->barrier_low;
+  lastpage  += (getposition(ip) + n - 1) / pagesize;
 
   if (n == 0)
     return 0;
@@ -123,19 +138,22 @@ static size_t write(void *ip, const uint8_t *bp, size_t n){
   /* data fitted in single page */
   if (firstpage == lastpage){
     len = n;
-    __fitted_write();
+    __fitted_write(ip, bp, len, &written);
+    bp += len;
     return written;
   }
 
   else{
     /* write first piece of data to first page boundary */
-    len = ((firstpage + 1) * EEPROM_PAGE_SIZE) - getposition(ip);
-    __fitted_write();
+    len = ((firstpage + 1) * pagesize) - getposition(ip);
+    __fitted_write(ip, bp, len, &written);
+    bp += len;
 
     /* now writes blocks at a size of pages (may be no one) */
-    while ((n - written) > EEPROM_PAGE_SIZE){
-      len = EEPROM_PAGE_SIZE;
-      __fitted_write();
+    while ((n - written) > pagesize){
+      len = pagesize;
+      __fitted_write(ip, bp, len, &written);
+      bp += len;
     }
 
     /* wrtie tail */
@@ -143,9 +161,10 @@ static size_t write(void *ip, const uint8_t *bp, size_t n){
     if (len == 0)
       return written;
     else{
-      __fitted_write();
+      __fitted_write(ip, bp, len, &written);
     }
   }
+
   return written;
 }
 
@@ -195,7 +214,7 @@ static size_t read(void *ip, uint8_t *bp, size_t n){
 #endif /* defined(STM32F1XX_I2C) */
 
   /* call low level function */
-  status  = eeprom_read(getposition(ip), bp, n);
+  status  = eeprom_read(((EepromFileStream*)ip)->cfg, getposition(ip), bp, n);
   if (status != RDY_OK)
     return 0;
   else{
@@ -227,10 +246,11 @@ static const struct EepromFilelStreamVMT vmt = {
  * @note      Fucntion allways successfully open file. All checking makes
  *            in read/write functions.
  */
-EepromFileStream* EepromOpen(EepromFileStream* efs){
-  init_eepromio();
+EepromFileStream* EepromFileOpen(EepromFileStream* efs, const I2CEepromFileConfig *eeprom_cfg){
+  chDbgCheck((efs != NULL) && (eeprom_cfg != NULL), "");
   chDbgCheck(efs->vmt != &vmt, "file allready opened");
   efs->vmt = &vmt;
+  efs->cfg = eeprom_cfg;
   efs->errors = FILE_OK;
   efs->position = 0;
   return efs;

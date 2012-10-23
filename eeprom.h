@@ -10,15 +10,56 @@ The work is provided "as is" without warranty of any kind, neither express nor i
 #include "ch.h"
 #include "hal.h"
 
-#include "24aa.h"
+typedef struct I2CEepromFileConfig {
+  /**
+   * Driver connecte to IC.
+   */
+  I2CDriver   *i2cp;
+  /**
+   * Lower barrier of file in EEPROM memory array.
+   */
+  uint32_t    barrier_low;
+  /**
+   * Higher barrier of file in EEPROM memory array.
+   */
+  uint32_t    barrier_hi;
+  /**
+   * Size of memory array in bytes.
+   * Check datasheet!!!
+   */
+  uint32_t    size;
+  /**
+   * Size of single page in bytes.
+   * Check datasheet!!!
+   */
+  uint16_t    pagesize;
+  /**
+   * Address of IC on I2C bus.
+   */
+  i2caddr_t   address;
+  /**
+   * Time needed by IC for single page writing.
+   * Check datasheet!!!
+   */
+  systime_t   write_time;
+  /**
+   * If true than file can automatically roll over without overflow
+   */
+  bool_t      ring;
+  /**
+   * Pointer to write buffer. Its size must be (pagesize + 2)
+   */
+  uint8_t     *write_buf;
+}I2CEepromFileConfig;
 
 /**
  * @brief   @p EepromFileStream specific data.
  */
 #define _eeprom_file_stream_data                                            \
   _base_file_stream_data                                                    \
-  uint32_t    errors;                                                       \
-  uint32_t    position;
+  const I2CEepromFileConfig   *cfg;                                         \
+  uint32_t                errors;                                           \
+  uint32_t                position;                                         \
 
 /**
  * @brief   @p EepromFileStream virtual methods table.
@@ -70,7 +111,7 @@ struct EepromFileStream {
 #define chFileStreamWrite(ip, bp, n) (chSequentialStreamWrite(ip, bp, n))
 
 
-EepromFileStream* EepromOpen(EepromFileStream* efs);
+EepromFileStream* EepromFileOpen(EepromFileStream* efs, const I2CEepromFileConfig *eeprom_cfg);
 
 uint8_t  EepromReadByte(EepromFileStream *EepromFile_p);
 uint16_t EepromReadHalfword(EepromFileStream *EepromFile_p);
