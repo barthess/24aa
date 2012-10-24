@@ -9,6 +9,6 @@ The work is provided "as is" without warranty of any kind, neither express nor i
 
 #include "eeprom.h"
 
-void eeprom_testsuit_run(void);
+Thread* eepromtest_clicmd(int argc, const char * const * argv, SerialDriver *sdp);
 
 #endif /* EEPROM_TESTSUIT_H_ */
