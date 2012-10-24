@@ -24,8 +24,11 @@ The work is provided "as is" without warranty of any kind, neither express nor i
  */
 
 static fileoffset_t getsize(void *ip){
+  uint32_t h,l;
   chDbgCheck((ip != NULL) && (((EepromFileStream*)ip)->vmt != NULL) && (((EepromFileStream*)ip)->cfg != NULL), "");
-  return ((EepromFileStream*)ip)->cfg->barrier_hi - ((EepromFileStream*)ip)->cfg->barrier_low;
+  h = ((EepromFileStream*)ip)->cfg->barrier_hi;
+  l = ((EepromFileStream*)ip)->cfg->barrier_low;
+  return  h - l;
 }
 
 static fileoffset_t getposition(void *ip){
@@ -251,6 +254,10 @@ static const struct EepromFilelStreamVMT vmt = {
 EepromFileStream* EepromFileOpen(EepromFileStream* efs, const I2CEepromFileConfig *eeprom_cfg){
   chDbgCheck((efs != NULL) && (eeprom_cfg != NULL), "");
   chDbgCheck(efs->vmt != &vmt, "file allready opened");
+  chDbgCheck(eeprom_cfg->barrier_hi > eeprom_cfg->barrier_low, "wrong barriers")
+  chDbgCheck(eeprom_cfg->pagesize < eeprom_cfg->size, "pagesize can not be lager than EEPROM size")
+  chDbgCheck(eeprom_cfg->barrier_hi < eeprom_cfg->size, "barrier out of bounds")
+
   efs->vmt = &vmt;
   efs->cfg = eeprom_cfg;
   efs->errors = FILE_OK;
