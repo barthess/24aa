@@ -311,6 +311,51 @@ static void printfileinfo(BaseSequentialStream *sdp, EepromFileStream *efsp){
 }
 
 /**
+ * Create overlapped files like this:
+ *
+ * |<---------- outer file ------------->|
+ * |                                     |
+ * [b1==b2=========================b3==b4]
+ *      |                           |
+ *      |<------ inner file ------->|
+ *
+ */
+
+static uint8_t o_buf[EEPROM_TX_DEPTH];
+static uint8_t i_buf[EEPROM_TX_DEPTH];
+static EepromFileStream ifile;
+static EepromFileStream ofile;
+
+static I2CEepromFileConfig o_cfg = {
+  &I2CD2,
+  0,
+  0,
+  EEPROM_SIZE,
+  EEPROM_PAGE_SIZE,
+  EEPROM_I2C_ADDR,
+  MS2ST(EEPROM_WRITE_TIME),
+  FALSE,
+  o_buf,
+};
+static I2CEepromFileConfig i_cfg = {
+  &I2CD2,
+  0,
+  0,
+  EEPROM_SIZE,
+  EEPROM_PAGE_SIZE,
+  EEPROM_I2C_ADDR,
+  MS2ST(EEPROM_WRITE_TIME),
+  FALSE,
+  i_buf,
+};
+
+static void overflow_check(uint32_t b1, uint32_t b2, uint32_t b3, uint32_t b4,
+                          uint32_t start,uint32_t len, bool_t ring,
+                          uint8_t pattern, bool_t autoinc){
+
+}
+
+/**
  *
  */
 static WORKING_AREA(EepromTestThreadWA, 512);
@@ -436,6 +481,7 @@ static msg_t EepromTestThread(void *sdp){
   if (memcmp(referencebuf, checkbuf, len) != 0)
     chDbgPanic("veryfication failed");
   OK();
+
 
 
 
