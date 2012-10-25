@@ -317,6 +317,8 @@ static WORKING_AREA(EepromTestThreadWA, 512);
 static msg_t EepromTestThread(void *sdp){
   chRegSetThreadName("EepromTst");
 
+  uint32_t status, len, pos;
+  uint8_t pattern;
   uint8_t eeprom_buf[EEPROM_TX_DEPTH];
   EepromFileStream EfsTest;
 
@@ -332,6 +334,7 @@ static msg_t EepromTestThread(void *sdp){
     eeprom_buf,
   };
 
+
   cli_println("basic tests");
   cli_println("--------------------------------------------------------------");
   cli_print("mount aligned file sized to whole test area");
@@ -340,6 +343,7 @@ static msg_t EepromTestThread(void *sdp){
   EepromFileOpen(&EfsTest, &eeprom_cfg);
   OK();
   printfileinfo(sdp, &EfsTest);
+
 
   cli_println("test fill with 0xFF");
   pattern_fill(&EfsTest, 0xFF);
@@ -352,15 +356,97 @@ static msg_t EepromTestThread(void *sdp){
   if (chThdShouldTerminate()){goto END;}
   cli_println("test fill with 0x00");
   pattern_fill(&EfsTest, 0x00);
+  cli_println("Closing file");
+  chFileStreamClose(&EfsTest);
+  OK();
 
 
-  cli_println("barries functionallity tests");
+  cli_println("Barries");
   cli_println("--------------------------------------------------------------");
+  cli_println("Create file with barries aligned to pages boundaries");
+  // write in reference buffer [00 55 55 55 55 00]
+  pattern = 0x55;
+  memset(referencebuf, 0x00, TEST_AREA_SIZE);
+  memset(referencebuf + eeprom_cfg.pagesize, 0x00, TEST_AREA_SIZE - (2 * eeprom_cfg.pagesize));
+  memset(checkbuf, pattern, TEST_AREA_SIZE);
+
+  eeprom_cfg.barrier_low  = TEST_AREA_START + eeprom_cfg.pagesize;
+  eeprom_cfg.barrier_hi   = TEST_AREA_END   - eeprom_cfg.pagesize;
+  EepromFileOpen(&EfsTest, &eeprom_cfg);
+  OK();
+  printfileinfo(sdp, &EfsTest);
+
+  // write in file [55 55 55 55]
+  cli_println("Write file without overflow");
+  pos = 0;
+  chFileStreamSeek(&EfsTest, pos);
+  len = TEST_AREA_SIZE - (2 * eeprom_cfg.pagesize);
+  status = chFileStreamWrite(&EfsTest, checkbuf, len);
+  if (status < len)
+    chDbgPanic("not all data written");
+  OK();
+
+  // now check
+  cli_println("Read and compare");
+  chFileStreamClose(&EfsTest);
+  eeprom_cfg.barrier_low  = TEST_AREA_START;
+  eeprom_cfg.barrier_hi   = TEST_AREA_END;
+  EepromFileOpen(&EfsTest, &eeprom_cfg);
+
+  pos = 0;
+  len = TEST_AREA_SIZE;
+  chFileStreamSeek(&EfsTest, pos);
+  status = chFileStreamRead(&EfsTest, checkbuf, len);
+  if (status < len)
+    chDbgPanic("reading back failed");
+  if (memcmp(referencebuf, checkbuf, len) != 0)
+    chDbgPanic("veryfication failed");
+  OK();
+
+
+
+
+  cli_println("Write file with overflow");
+  chFileStreamClose(&EfsTest);
+  eeprom_cfg.barrier_low  = TEST_AREA_START + eeprom_cfg.pagesize;
+  eeprom_cfg.barrier_hi   = TEST_AREA_END   - eeprom_cfg.pagesize;
+  EepromFileOpen(&EfsTest, &eeprom_cfg);
+
+  pos = 1;
+  chFileStreamSeek(&EfsTest, pos);
+  len = TEST_AREA_SIZE - (2 * eeprom_cfg.pagesize);
+  status = chFileStreamWrite(&EfsTest, checkbuf, len);
+  if (status != len - pos)
+    chDbgPanic("not all data written or wrong number reported");
+  OK();
+
+  // now check
+  cli_println("Read and compare");
+  chFileStreamClose(&EfsTest);
+  eeprom_cfg.barrier_low  = TEST_AREA_START;
+  eeprom_cfg.barrier_hi   = TEST_AREA_END;
+  EepromFileOpen(&EfsTest, &eeprom_cfg);
+
+  pos = 0;
+  len = TEST_AREA_SIZE;
+  chFileStreamSeek(&EfsTest, pos);
+  status = chFileStreamRead(&EfsTest, checkbuf, len);
+  if (status < len)
+    chDbgPanic("reading back failed");
+  if (memcmp(referencebuf, checkbuf, len) != 0)
+    chDbgPanic("veryfication failed");
+  OK();
+
+
+
+
+
+
+
+
   /*
-   * выровренная запись по барьерам в линейном файле
-   * невыровненная
-   * выровренная запись по барьерам в кольцевом
-   * невыровненная
+   * запись по барьерам в линейном (кольцевом) файле когда файл выровнен (невыровнен)
+   *
    * проверка файла из (1, 2, 4) байт (кольцевой, линейный)
    * проверка оберток??? (по идее не сильно надо)
    */
