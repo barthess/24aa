@@ -47,11 +47,7 @@ typedef struct I2CEepromFileConfig {
    */
   bool_t      ring;
   /**
-   * Pointer to write buffer. Its size must be:
-   * if (filesize >= pagesize)
-   *    (pagesize + 2)
-   * else
-   *    (filesize + 2)
+   * Pointer to write buffer. The safest size is (pagesize + 2)
    */
   uint8_t     *write_buf;
 }I2CEepromFileConfig;
