@@ -39,14 +39,8 @@ static fileoffset_t getposition(void *ip){
 static fileoffset_t lseek(void *ip, fileoffset_t offset){
   chDbgCheck((ip != NULL) && (((EepromFileStream*)ip)->vmt != NULL), "");
   uint32_t size = getsize(ip);
-  if (((EepromFileStream*)ip)->cfg->ring){
-    /* wrap pointer if need */
-    offset = offset % size;
-  }
-  else{
-    if (offset > size)
-      offset = size;
-  }
+  if (offset > size)
+    offset = size;
   ((EepromFileStream*)ip)->position = offset;
   return offset;
 }
@@ -86,9 +80,6 @@ static msg_t get(void *ip){
  * @brief   Determines and returns size of data that can be processed
  */
 static size_t __clamp_size(void *ip, size_t n){
-  if (((EepromFileStream*)ip)->cfg->ring)
-    return n; /* unlimited file */
-
   if ((getposition(ip) + n) > getsize(ip))
     return getsize(ip) - getposition(ip);
   else
@@ -101,8 +92,7 @@ static size_t __clamp_size(void *ip, size_t n){
 static void __fitted_write(void *ip, const uint8_t *data, size_t len, uint32_t *written){
   msg_t status = RDY_RESET;
 
-  if (len == 0)
-    return;
+  chDbgCheck(len != 0, "something broken in hi level part");
 
   status  = eeprom_write(((EepromFileStream*)ip)->cfg, getposition(ip), data, len);
   if (status == RDY_OK){
@@ -128,22 +118,6 @@ static size_t write(void *ip, const uint8_t *bp, size_t n){
 
   chDbgCheck((ip != NULL) && (((EepromFileStream*)ip)->vmt != NULL), "");
 
-  written = 0;
-  if (((EepromFileStream*)ip)->cfg->ring){
-    /* split data in chunks and recursively write it */
-    len = n;
-    while (len > getsize(ip) - getposition(ip)){
-      written += write(ip, bp, getsize(ip) - getposition(ip));
-      len -= written;
-      bp += written;
-    }
-    n = n - written; /* las data bytes to be written as usual */
-  }
-
-  pagesize  = ((EepromFileStream*)ip)->cfg->pagesize;
-  firstpage = (((EepromFileStream*)ip)->cfg->barrier_low + getposition(ip)) / pagesize;
-  lastpage  = (((EepromFileStream*)ip)->cfg->barrier_low + getposition(ip) + n - 1) / pagesize;
-
   if (n == 0)
     return 0;
 
@@ -151,6 +125,11 @@ static size_t write(void *ip, const uint8_t *bp, size_t n){
   if (n == 0)
     return 0;
 
+  pagesize  =  ((EepromFileStream*)ip)->cfg->pagesize;
+  firstpage = (((EepromFileStream*)ip)->cfg->barrier_low + getposition(ip)) / pagesize;
+  lastpage  = (((EepromFileStream*)ip)->cfg->barrier_low + getposition(ip) + n - 1) / pagesize;
+
+  written = 0;
   /* data fitted in single page */
   if (firstpage == lastpage){
     len = n;

@@ -19,25 +19,25 @@ The work is provided "as is" without warranty of any kind, neither express nor i
  * DEFINES
  ******************************************************************************
  */
-//#define EEPROM_PAGE_SIZE    128
-//#define EEPROM_SIZE         65536
-//#define EEPROM_I2C_ADDR     0b1010000
-//#define EEPROM_WRITE_TIME   20
-//#define EEPROM_TX_DEPTH     (EEPROM_PAGE_SIZE + 2)
-//#define EEPROM_I2CD         (&I2CD2)
-//#define TEST_AREA_START   0
-//#define TEST_AREA_SIZE    1024
-//#define TEST_AREA_END     (TEST_AREA_START + TEST_AREA_SIZE)
-
-#define EEPROM_PAGE_SIZE    32
-#define EEPROM_SIZE         4096
+#define EEPROM_PAGE_SIZE    128
+#define EEPROM_SIZE         65536
 #define EEPROM_I2C_ADDR     0b1010000
-#define EEPROM_WRITE_TIME   5
+#define EEPROM_WRITE_TIME   20
 #define EEPROM_TX_DEPTH     (EEPROM_PAGE_SIZE + 2)
-#define EEPROM_I2CD         (&I2CD1)
+#define EEPROM_I2CD         (&I2CD2)
 #define TEST_AREA_START     1024
 #define TEST_AREA_SIZE      1024
 #define TEST_AREA_END       (TEST_AREA_START + TEST_AREA_SIZE)
+
+//#define EEPROM_PAGE_SIZE    32
+//#define EEPROM_SIZE         4096
+//#define EEPROM_I2C_ADDR     0b1010000
+//#define EEPROM_WRITE_TIME   5
+//#define EEPROM_TX_DEPTH     (EEPROM_PAGE_SIZE + 2)
+//#define EEPROM_I2CD         (&I2CD1)
+//#define TEST_AREA_START     1024
+//#define TEST_AREA_SIZE      1024
+//#define TEST_AREA_END       (TEST_AREA_START + TEST_AREA_SIZE)
 
 /* shortcut to print OK message*/
 #define OK(); do{cli_println(" ... OK"); chThdSleepMilliseconds(20);}while(0)
@@ -73,7 +73,6 @@ static I2CEepromFileConfig ocfg = {
   EEPROM_PAGE_SIZE,
   EEPROM_I2C_ADDR,
   MS2ST(EEPROM_WRITE_TIME),
-  FALSE,
   o_buf,
 };
 static I2CEepromFileConfig icfg = {
@@ -84,7 +83,6 @@ static I2CEepromFileConfig icfg = {
   EEPROM_PAGE_SIZE,
   EEPROM_I2C_ADDR,
   MS2ST(EEPROM_WRITE_TIME),
-  FALSE,
   i_buf,
 };
 
@@ -103,7 +101,7 @@ static void printfileinfo(BaseSequentialStream *sdp, EepromFileStream *efsp){
         efsp->cfg->barrier_low,
         efsp->cfg->barrier_hi);
   cli_println("");
-  chThdSleepMilliseconds(20);
+  chThdSleepMilliseconds(100);
 }
 
 /**
@@ -157,7 +155,7 @@ static void pattern_fill(EepromFileStream *EfsTest, uint8_t pattern){
         while (bp < referencebuf + b3){
  */
 static void overflow_check(uint32_t b1, uint32_t b2, uint32_t b3, uint32_t b4,
-                          uint32_t istart, uint32_t ilen, bool_t iring,
+                          uint32_t istart, uint32_t ilen,
                           uint8_t pattern, bool_t pat_autoinc,
                           BaseSequentialStream *sdp){
   uint32_t status, i, n;
@@ -166,9 +164,6 @@ static void overflow_check(uint32_t b1, uint32_t b2, uint32_t b3, uint32_t b4,
 
   chprintf(sdp, "b1=%u, b2=%u, b3=%u, b4=%u, istart=%u, ilen=%u, ",
             b1, b2, b3, b4, istart, ilen);
-  cli_print("iring=");
-  if (iring)          cli_print("TRUE, ");
-  else                cli_print("FALSE, ");
   cli_print("autoinc=");
   if (pat_autoinc)    cli_print("TRUE");
   else                cli_print("FALSE");
@@ -183,39 +178,22 @@ static void overflow_check(uint32_t b1, uint32_t b2, uint32_t b3, uint32_t b4,
   /* open inner file */
   icfg.barrier_low  = b2;
   icfg.barrier_hi   = b3;
-  if (iring)
-    icfg.ring = TRUE;
-  else
-    icfg.ring = FALSE;
   EepromFileOpen(&ifile, &icfg);
 
   /* reference buffer */
   memset(referencebuf, 0x00, b4-b1);
-
   n = b2 - b1 + istart;
-  if (iring){
-    for (i = ilen; i != 0; i--){
-      referencebuf[n] = pattern;
-      n++;
-      if (n == (b3 - b1))
-        n = b2 - b1;
-      if (pat_autoinc)
-        pattern++;
+  if ((ilen + istart) > (b3-b2))
+    i = b3 - b2 - istart;
+  else
+    i = ilen;
+  while (i > 0){
+    referencebuf[n] = pattern;
+    n++;
+    i--;
+    if (pat_autoinc)
+      pattern++;
     }
-  }
-  else{
-    if ((ilen + istart) > (b3-b2))
-      i = b3 - b2 - istart;
-    else
-      i = ilen;
-    while (i > 0){
-      referencebuf[n] = pattern;
-      n++;
-      i--;
-      if (pat_autoinc)
-        pattern++;
-    }
-  }
 
   /* check buffer */
   n = 0;
@@ -230,21 +208,15 @@ static void overflow_check(uint32_t b1, uint32_t b2, uint32_t b3, uint32_t b4,
   chThdSleepMilliseconds(20);
   chFileStreamSeek(&ifile, istart);
   status = chFileStreamWrite(&ifile, checkbuf, ilen);
-  if (iring){
-    if (status != ilen)
-      chDbgPanic("something broken inside low level driver");
-  }
-  else{
-    if ((istart + ilen) > (b3 - b2)){ /* data must be clamped */
-      if (status != (b3 - b2 - istart))
-        chDbgPanic("not all data written or overflow ocrred");
-    }
-    else{/* data fitted in file */
-      if (status != ilen)
-        chDbgPanic("not all data written or overflow ocrred");
-    }
-  }
 
+  if ((istart + ilen) > (b3 - b2)){ /* data must be clamped */
+    if (status != (b3 - b2 - istart))
+      chDbgPanic("not all data written or overflow ocrred");
+  }
+  else{/* data fitted in file */
+    if (status != ilen)
+      chDbgPanic("not all data written or overflow ocrred");
+  }
 
   /* read outer file and compare content with reference buffer */
   memset(checkbuf, 0x00, b4-b1);
@@ -263,7 +235,7 @@ static void overflow_check(uint32_t b1, uint32_t b2, uint32_t b3, uint32_t b4,
 /**
  *
  */
-static WORKING_AREA(EepromTestThreadWA, 512);
+static WORKING_AREA(EepromTestThreadWA, 1024);
 static msg_t EepromTestThread(void *sdp){
   chRegSetThreadName("EepromTst");
 
@@ -275,24 +247,22 @@ static msg_t EepromTestThread(void *sdp){
   EepromFileOpen(&ofile, &ocfg);
   OK();
   printfileinfo(sdp, &ofile);
-
-
-//  cli_print("test fill with 0xFF");
-//  pattern_fill(&ofile, 0xFF);
-//  if (chThdShouldTerminate()){goto END;}
-//  OK();
-//  cli_print("test fill with 0xAA");
-//  pattern_fill(&ofile, 0xAA);
-//  if (chThdShouldTerminate()){goto END;}
-//  OK();
-//  cli_print("test fill with 0x55");
-//  pattern_fill(&ofile, 0x55);
-//  if (chThdShouldTerminate()){goto END;}
-//  OK();
-//  cli_print("test fill with 0x00");
-//  pattern_fill(&ofile, 0x00);
-//  if (chThdShouldTerminate()){goto END;}
-//  OK();
+  cli_print("test fill with 0xFF");
+  pattern_fill(&ofile, 0xFF);
+  if (chThdShouldTerminate()){goto END;}
+  OK();
+  cli_print("test fill with 0xAA");
+  pattern_fill(&ofile, 0xAA);
+  if (chThdShouldTerminate()){goto END;}
+  OK();
+  cli_print("test fill with 0x55");
+  pattern_fill(&ofile, 0x55);
+  if (chThdShouldTerminate()){goto END;}
+  OK();
+  cli_print("test fill with 0x00");
+  pattern_fill(&ofile, 0x00);
+  if (chThdShouldTerminate()){goto END;}
+  OK();
   cli_print("Closing file");
   chFileStreamClose(&ofile);
   OK();
@@ -308,272 +278,97 @@ static msg_t EepromTestThread(void *sdp){
   ilen = b3-b2;
 
   cli_println("    Linear barriers testing.");
-//  chThdSleepMilliseconds(20);
-//  overflow_check(
-//      b1,
-//      b2,
-//      b3,
-//      b4,
-//      istart,
-//      ilen,
-//      FALSE,  //iring
-//      pattern,   //pattern
-//      FALSE,  //pat_autoinc
-//      sdp);
-//  if (chThdShouldTerminate()){goto END;}
-//  pattern++;
-//
-//  overflow_check(
-//      b1,
-//      b2,
-//      b3,
-//      b4,
-//      istart + 1,
-//      ilen - 1,
-//      FALSE,  //iring
-//      pattern,   //pattern
-//      FALSE,  //pat_autoinc
-//      sdp);
-//  if (chThdShouldTerminate()){goto END;}
-//  pattern++;
-//
-//  overflow_check(
-//      b1,
-//      b2,
-//      b3,
-//      b4,
-//      istart + 1,
-//      ilen,
-//      FALSE,  //iring
-//      pattern,   //pattern
-//      FALSE,  //pat_autoinc
-//      sdp);
-//  if (chThdShouldTerminate()){goto END;}
-//  pattern++;
-//
-//  overflow_check(
-//      b1,
-//      b2,
-//      b3,
-//      b4,
-//      istart + 1,
-//      ilen + 23,
-//      FALSE,  //iring
-//      pattern,   //pattern
-//      FALSE,  //pat_autoinc
-//      sdp);
-//  if (chThdShouldTerminate()){goto END;}
-//  pattern++;
-//
-//  overflow_check(
-//      b1,
-//      b2 - 1,
-//      b3 + 1,
-//      b4,
-//      istart,
-//      ilen,
-//      FALSE,  //iring
-//      pattern,   //pattern
-//      FALSE,  //pat_autoinc
-//      sdp);
-//  if (chThdShouldTerminate()){goto END;}
-//  pattern++;
-//
-//  overflow_check(
-//      b1,
-//      b2 - 2,
-//      b3 + 2,
-//      b4,
-//      istart + 2,
-//      ilen,
-//      FALSE,  //iring
-//      pattern,   //pattern
-//      FALSE,  //pat_autoinc
-//      sdp);
-//  if (chThdShouldTerminate()){goto END;}
-//  pattern++;
-//
-//  overflow_check(
-//      b1,
-//      b2 - 1,
-//      b3 + 1,
-//      b4,
-//      istart + 1,
-//      ilen + 23,
-//      FALSE,  //iring
-//      pattern,   //pattern
-//      FALSE,  //pat_autoinc
-//      sdp);
-//  if (chThdShouldTerminate()){goto END;}
-//  pattern++;
-//
-//  overflow_check(
-//      b1,
-//      b2 - 2,
-//      b3 + 2,
-//      b4,
-//      istart + 1,
-//      ilen + 23,
-//      FALSE,  //iring
-//      pattern,   //pattern
-//      FALSE,  //pat_autoinc
-//      sdp);
-//  if (chThdShouldTerminate()){goto END;}
-//  pattern++;
-//
-//  overflow_check(
-//      b1,
-//      b2 + 2,
-//      b3 - 3,
-//      b4,
-//      istart + 2,
-//      ilen,
-//      FALSE,  //iring
-//      pattern,   //pattern
-//      FALSE,  //pat_autoinc
-//      sdp);
-//  if (chThdShouldTerminate()){goto END;}
-//  pattern++;
-
-  /***************************************************************************/
-  cli_println("    Circular barriers testing.");
-
   chThdSleepMilliseconds(20);
-//  overflow_check(
-//      b1,
-//      b2,
-//      b3,
-//      b4,
-//      istart,
-//      ilen,
-//      TRUE,  //iring
-//      pattern,   //pattern
-//      FALSE,  //pat_autoinc
-//      sdp);
-//  if (chThdShouldTerminate()){goto END;}
-//  pattern++;
-//
-//  overflow_check(
-//      b1,
-//      b2,
-//      b3,
-//      b4,
-//      istart + 1,
-//      ilen - 1,
-//      TRUE,  //iring
-//      pattern,   //pattern
-//      FALSE,  //pat_autoinc
-//      sdp);
-//  if (chThdShouldTerminate()){goto END;}
-//  pattern++;
-
-  overflow_check(
-      b1,
-      b2,
-      b3,
-      b4,
-      istart + 5,
-      ilen,
-      TRUE,  //iring
-      pattern,   //pattern
-      FALSE,  //pat_autoinc
-      sdp);
+  overflow_check( b1, b2, b3, b4, istart, ilen, pattern, FALSE, sdp);
   if (chThdShouldTerminate()){goto END;}
   pattern++;
-
-  overflow_check(
-      b1,
-      b2,
-      b3,
-      b4,
-      istart + 1,
-      ilen + 23,
-      TRUE,  //iring
-      pattern,   //pattern
-      FALSE,  //pat_autoinc
-      sdp);
+  overflow_check( b1, b2, b3, b4, istart + 1, ilen - 1, pattern, FALSE, sdp);
   if (chThdShouldTerminate()){goto END;}
   pattern++;
-
-  overflow_check(
-      b1,
-      b2 - 1,
-      b3 + 1,
-      b4,
-      istart,
-      ilen,
-      TRUE,  //iring
-      pattern,   //pattern
-      FALSE,  //pat_autoinc
-      sdp);
+  overflow_check( b1, b2, b3, b4, istart + 1, ilen, pattern, FALSE, sdp);
   if (chThdShouldTerminate()){goto END;}
   pattern++;
-
-  overflow_check(
-      b1,
-      b2 - 2,
-      b3 + 2,
-      b4,
-      istart + 2,
-      ilen,
-      TRUE,  //iring
-      pattern,   //pattern
-      FALSE,  //pat_autoinc
-      sdp);
+  overflow_check( b1, b2, b3, b4, istart + 1, ilen + 23, pattern, FALSE, sdp);
   if (chThdShouldTerminate()){goto END;}
   pattern++;
-
-  overflow_check(
-      b1,
-      b2 - 1,
-      b3 + 1,
-      b4,
-      istart + 1,
-      ilen + 23,
-      TRUE,  //iring
-      pattern,   //pattern
-      FALSE,  //pat_autoinc
-      sdp);
+  overflow_check( b1, b2 - 1, b3 + 1, b4, istart, ilen, pattern,  FALSE, sdp);
   if (chThdShouldTerminate()){goto END;}
   pattern++;
-
-  overflow_check(
-      b1,
-      b2 - 2,
-      b3 + 2,
-      b4,
-      istart + 1,
-      ilen + 23,
-      TRUE,  //iring
-      pattern,   //pattern
-      FALSE,  //pat_autoinc
-      sdp);
+  overflow_check( b1, b2 - 2, b3 + 2, b4, istart + 2, ilen, pattern,  FALSE, sdp);
   if (chThdShouldTerminate()){goto END;}
   pattern++;
-
-  overflow_check(
-      b1,
-      b2 + 2,
-      b3 - 3,
-      b4,
-      istart + 2,
-      ilen,
-      TRUE,  //iring
-      pattern,   //pattern
-      FALSE,  //pat_autoinc
-      sdp);
+  overflow_check( b1, b2 - 1, b3 + 1, b4, istart + 1, ilen + 23, pattern,  FALSE, sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
+  overflow_check( b1, b2 - 2, b3 + 2, b4, istart + 1, ilen + 23, pattern,  FALSE, sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
+  overflow_check( b1, b2 + 2, b3 - 3, b4, istart + 2, ilen, pattern, FALSE,  sdp);
   if (chThdShouldTerminate()){goto END;}
   pattern++;
 
 
+  overflow_check( b1, b2, b2 + 1, b4, istart, ilen, pattern,  FALSE,  sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
+  overflow_check( b1, b2, b2 + 2, b4, istart, ilen, pattern, FALSE, sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
+  overflow_check( b1, b2, b2 + 3, b4, istart, ilen, pattern, FALSE, sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
 
 
+  overflow_check( b1, b2 + 1, b2 + 2, b4, istart, ilen, pattern, FALSE, sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
+  overflow_check( b1, b2 + 1, b2 + 3, b4, istart, ilen, pattern, FALSE, sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
+  overflow_check( b1, b2 + 1, b2 + 4, b4, istart, ilen, pattern, FALSE, sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
 
+  overflow_check( b1, b2 - 1, b2,     b4, istart, ilen, pattern, FALSE, sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
+  overflow_check( b1, b2 - 1, b2 + 1, b4, istart, ilen, pattern, FALSE, sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
+  overflow_check( b1, b2 - 1, b2 + 2, b4, istart, ilen, pattern, FALSE, sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
 
-  /*
-   * проверка файла из (1, 2, 4) байт (кольцевой, линейный)
-   * базовая проверка оберток
-   */
+  overflow_check( b1, b2 - 1, b2 + 1, b4, istart + 1, ilen, pattern, FALSE, sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
+  overflow_check( b1, b2 - 1, b2 + 2, b4, istart + 1, ilen, pattern, FALSE, sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
+  overflow_check( b1, b2 - 1, b2 + 3, b4, istart + 1, ilen, pattern, FALSE, sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
+
+  cli_println("    Basic API testing.");
+  chThdSleepMilliseconds(20);
+
+  ocfg.barrier_low  = TEST_AREA_START;
+  ocfg.barrier_hi   = TEST_AREA_END;
+  EepromFileOpen(&ofile, &ocfg);
+  chFileStreamSeek(&ofile, 0);
+  EepromWriteByte(&ofile, 0x11);
+  EepromWriteHalfword(&ofile, 0x2222);
+  EepromWriteWord(&ofile, 0x33333333);
+  chFileStreamSeek(&ofile, 0);
+  if(EepromReadByte(&ofile) != 0x11)
+    chDbgPanic("");
+  if(EepromReadHalfword(&ofile) != 0x2222)
+    chDbgPanic("");
+  if(EepromReadWord(&ofile) != 0x33333333)
+    chDbgPanic("");
+  chFileStreamClose(&ofile);
+  OK();
+
   cli_println("All tests passed successfully.");
 END:
   chThdExit(0);

@@ -43,10 +43,6 @@ typedef struct I2CEepromFileConfig {
    */
   systime_t   write_time;
   /**
-   * If true than file can automatically roll over without overflow
-   */
-  bool_t      ring;
-  /**
    * Pointer to write buffer. The safest size is (pagesize + 2)
    */
   uint8_t     *write_buf;
