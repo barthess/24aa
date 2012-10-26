@@ -19,15 +19,25 @@ The work is provided "as is" without warranty of any kind, neither express nor i
  * DEFINES
  ******************************************************************************
  */
-#define EEPROM_PAGE_SIZE    128
-#define EEPROM_SIZE         65536
-#define EEPROM_I2C_ADDR     0b1010000
-#define EEPROM_WRITE_TIME   20
-#define EEPROM_TX_DEPTH     (EEPROM_PAGE_SIZE + 2)
+//#define EEPROM_PAGE_SIZE    128
+//#define EEPROM_SIZE         65536
+//#define EEPROM_I2C_ADDR     0b1010000
+//#define EEPROM_WRITE_TIME   20
+//#define EEPROM_TX_DEPTH     (EEPROM_PAGE_SIZE + 2)
+//#define EEPROM_I2CD         (&I2CD2)
+//#define TEST_AREA_START   0
+//#define TEST_AREA_SIZE    1024
+//#define TEST_AREA_END     (TEST_AREA_START + TEST_AREA_SIZE)
 
-#define TEST_AREA_START   0
-#define TEST_AREA_SIZE    1024
-#define TEST_AREA_END     (TEST_AREA_START + TEST_AREA_SIZE)
+#define EEPROM_PAGE_SIZE    32
+#define EEPROM_SIZE         4096
+#define EEPROM_I2C_ADDR     0b1010000
+#define EEPROM_WRITE_TIME   5
+#define EEPROM_TX_DEPTH     (EEPROM_PAGE_SIZE + 2)
+#define EEPROM_I2CD         (&I2CD1)
+#define TEST_AREA_START     1024
+#define TEST_AREA_SIZE      1024
+#define TEST_AREA_END       (TEST_AREA_START + TEST_AREA_SIZE)
 
 /* shortcut to print OK message*/
 #define OK(); do{cli_println(" ... OK"); chThdSleepMilliseconds(20);}while(0)
@@ -56,7 +66,7 @@ static EepromFileStream ifile;
 static EepromFileStream ofile;
 
 static I2CEepromFileConfig ocfg = {
-  &I2CD2,
+  EEPROM_I2CD,
   0,
   0,
   EEPROM_SIZE,
@@ -67,7 +77,7 @@ static I2CEepromFileConfig ocfg = {
   o_buf,
 };
 static I2CEepromFileConfig icfg = {
-  &I2CD2,
+  EEPROM_I2CD,
   0,
   0,
   EEPROM_SIZE,
@@ -284,9 +294,23 @@ static msg_t EepromTestThread(void *sdp){
       sdp);
   if (chThdShouldTerminate()){goto END;}
 
+  overflow_check(
+      TEST_AREA_START,                        //b1
+      TEST_AREA_START + EEPROM_PAGE_SIZE,     //b2
+      TEST_AREA_END - EEPROM_PAGE_SIZE,       //b3
+      TEST_AREA_END,                          //b4
+      1,                                      //istart
+      TEST_AREA_END - 1 - 2 * EEPROM_PAGE_SIZE,   //ilen
+      FALSE,                                  //iring
+      0xAA,                                   //pattern
+      FALSE,                                  //pat_autoinc
+      sdp);
+  if (chThdShouldTerminate()){goto END;}
+
+
+
+
   /*
-   * запись по барьерам в линейном (кольцевом) файле когда файл выровнен (невыровнен)
-   *
    * проверка файла из (1, 2, 4) байт (кольцевой, линейный)
    * базовая проверка оберток
    */
