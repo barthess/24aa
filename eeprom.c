@@ -101,6 +101,9 @@ static size_t __clamp_size(void *ip, size_t n){
 static void __fitted_write(void *ip, const uint8_t *data, size_t len, uint32_t *written){
   msg_t status = RDY_RESET;
 
+  if (len == 0)
+    return;
+
   status  = eeprom_write(((EepromFileStream*)ip)->cfg, getposition(ip), data, len);
   if (status == RDY_OK){
     *written += len;
@@ -118,19 +121,28 @@ static void __fitted_write(void *ip, const uint8_t *data, size_t len, uint32_t *
 static size_t write(void *ip, const uint8_t *bp, size_t n){
 
   size_t   len = 0;     /* bytes to be written at one trasaction */
-  uint32_t written = 0; /* total bytes successfully written */
+  uint32_t written; /* total bytes successfully written */
   uint16_t pagesize;
   uint32_t firstpage;
   uint32_t lastpage;
 
   chDbgCheck((ip != NULL) && (((EepromFileStream*)ip)->vmt != NULL), "");
 
-  pagesize   = ((EepromFileStream*)ip)->cfg->pagesize;
-  firstpage  = ((EepromFileStream*)ip)->cfg->barrier_low / pagesize;
-  lastpage   = firstpage;
+  written = 0;
+  if (((EepromFileStream*)ip)->cfg->ring){
+    /* split data in chunks and recursively write it */
+    len = n;
+    while (len > getsize(ip) - getposition(ip)){
+      written += write(ip, bp, getsize(ip) - getposition(ip));
+      len -= written;
+      bp += written;
+    }
+    n = n - written; /* las data bytes to be written as usual */
+  }
 
-  firstpage += getposition(ip) / pagesize;
-  lastpage  += (getposition(ip) + n - 1) / pagesize;
+  pagesize  = ((EepromFileStream*)ip)->cfg->pagesize;
+  firstpage = (((EepromFileStream*)ip)->cfg->barrier_low + getposition(ip)) / pagesize;
+  lastpage  = (((EepromFileStream*)ip)->cfg->barrier_low + getposition(ip) + n - 1) / pagesize;
 
   if (n == 0)
     return 0;

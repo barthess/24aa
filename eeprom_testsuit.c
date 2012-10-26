@@ -103,6 +103,7 @@ static void printfileinfo(BaseSequentialStream *sdp, EepromFileStream *efsp){
         efsp->cfg->barrier_low,
         efsp->cfg->barrier_hi);
   cli_println("");
+  chThdSleepMilliseconds(20);
 }
 
 /**
@@ -128,7 +129,6 @@ static void pattern_fill(EepromFileStream *EfsTest, uint8_t pattern){
   status = chFileStreamWrite(EfsTest, referencebuf, len);
   if (status != len)
     chDbgPanic("write failed");
-  OK();
 
   /* check */
   pos = chFileStreamGetPosition(EfsTest);
@@ -147,19 +147,20 @@ static void pattern_fill(EepromFileStream *EfsTest, uint8_t pattern){
 /**
  * Create overlapped files like this:
  *
- * |<---------- outer file ------------->|
- * |                                     |
- * [b1==b2=========================b3==b4]
- *      |                           |
- *      |<------ inner file ------->|
+ *       |<--------- outer file ------------>|
+ *       |                                   |
+ * ======b1==b2========================b3===b4======
+ *           |                          |
+ *           |<------ inner file ------>|
  *
+ *    bp = referencebuf + (b2 - b1) + istart;
+        while (bp < referencebuf + b3){
  */
 static void overflow_check(uint32_t b1, uint32_t b2, uint32_t b3, uint32_t b4,
                           uint32_t istart, uint32_t ilen, bool_t iring,
                           uint8_t pattern, bool_t pat_autoinc,
                           BaseSequentialStream *sdp){
-  uint32_t status, i;
-  uint8_t* bp = NULL;
+  uint32_t status, i, n;
 
   chDbgCheck(ilen < (b4-b1),"sequences more than length of outer file can not be verified");
 
@@ -171,6 +172,7 @@ static void overflow_check(uint32_t b1, uint32_t b2, uint32_t b3, uint32_t b4,
   cli_print("autoinc=");
   if (pat_autoinc)    cli_print("TRUE");
   else                cli_print("FALSE");
+  chThdSleepMilliseconds(50);
 
   /* open outer file and clear it */
   ocfg.barrier_low  = b1;
@@ -181,35 +183,42 @@ static void overflow_check(uint32_t b1, uint32_t b2, uint32_t b3, uint32_t b4,
   /* open inner file */
   icfg.barrier_low  = b2;
   icfg.barrier_hi   = b3;
+  if (iring)
+    icfg.ring = TRUE;
+  else
+    icfg.ring = FALSE;
   EepromFileOpen(&ifile, &icfg);
 
   /* reference buffer */
   memset(referencebuf, 0x00, b4-b1);
+
+  n = b2 - b1 + istart;
   if (iring){
-    i = ilen;
-    bp = referencebuf + b2 + istart;
-    while (i > 0){
-      *bp = pattern;
-      bp++;
-      if (bp > referencebuf + b3)
-        bp = referencebuf + b2;
-      i--;
+    for (i = ilen; i != 0; i--){
+      referencebuf[n] = pattern;
+      n++;
+      if (n == (b3 - b1))
+        n = b2 - b1;
       if (pat_autoinc)
         pattern++;
     }
   }
   else{
-    bp = referencebuf + b2 + istart;
-    while (bp < referencebuf + b3){
-      *bp = pattern;
-      bp++;
+    if ((ilen + istart) > (b3-b2))
+      i = b3 - b2 - istart;
+    else
+      i = ilen;
+    while (i > 0){
+      referencebuf[n] = pattern;
+      n++;
+      i--;
       if (pat_autoinc)
         pattern++;
     }
   }
 
   /* check buffer */
-  uint32_t n = 0;
+  n = 0;
   while (n < ilen){
     checkbuf[n] = pattern;
     n++;
@@ -218,21 +227,37 @@ static void overflow_check(uint32_t b1, uint32_t b2, uint32_t b3, uint32_t b4,
   }
 
   /* now write check buffer content into inner file */
+  chThdSleepMilliseconds(20);
   chFileStreamSeek(&ifile, istart);
   status = chFileStreamWrite(&ifile, checkbuf, ilen);
-  if (status < ilen)
-    chDbgPanic("not all data written");
+  if (iring){
+    if (status != ilen)
+      chDbgPanic("something broken inside low level driver");
+  }
+  else{
+    if ((istart + ilen) > (b3 - b2)){ /* data must be clamped */
+      if (status != (b3 - b2 - istart))
+        chDbgPanic("not all data written or overflow ocrred");
+    }
+    else{/* data fitted in file */
+      if (status != ilen)
+        chDbgPanic("not all data written or overflow ocrred");
+    }
+  }
+
 
   /* read outer file and compare content with reference buffer */
+  memset(checkbuf, 0x00, b4-b1);
   chFileStreamSeek(&ofile, 0);
   status = chFileStreamRead(&ofile, checkbuf, b4-b1);
-  if (status < (b4-b1))
+  if (status != (b4-b1))
     chDbgPanic("reading back failed");
   if (memcmp(referencebuf, checkbuf, b4-b1) != 0)
     chDbgPanic("veryfication failed");
 
   chFileStreamClose(&ofile);
   chFileStreamClose(&ifile);
+  OK();
 }
 
 /**
@@ -252,60 +277,295 @@ static msg_t EepromTestThread(void *sdp){
   printfileinfo(sdp, &ofile);
 
 
-  cli_print("test fill with 0xFF");
-  pattern_fill(&ofile, 0xFF);
-  if (chThdShouldTerminate()){goto END;}
-  cli_print("test fill with 0xAA");
-  pattern_fill(&ofile, 0xAA);
-  if (chThdShouldTerminate()){goto END;}
-  cli_print("test fill with 0x55");
-  pattern_fill(&ofile, 0x55);
-  if (chThdShouldTerminate()){goto END;}
-  cli_print("test fill with 0x00");
-  pattern_fill(&ofile, 0x00);
-  if (chThdShouldTerminate()){goto END;}
+//  cli_print("test fill with 0xFF");
+//  pattern_fill(&ofile, 0xFF);
+//  if (chThdShouldTerminate()){goto END;}
+//  OK();
+//  cli_print("test fill with 0xAA");
+//  pattern_fill(&ofile, 0xAA);
+//  if (chThdShouldTerminate()){goto END;}
+//  OK();
+//  cli_print("test fill with 0x55");
+//  pattern_fill(&ofile, 0x55);
+//  if (chThdShouldTerminate()){goto END;}
+//  OK();
+//  cli_print("test fill with 0x00");
+//  pattern_fill(&ofile, 0x00);
+//  if (chThdShouldTerminate()){goto END;}
+//  OK();
   cli_print("Closing file");
   chFileStreamClose(&ofile);
   OK();
 
-  overflow_check(
-      TEST_AREA_START,                        //b1
-      TEST_AREA_START + EEPROM_PAGE_SIZE,     //b2
-      TEST_AREA_END - EEPROM_PAGE_SIZE,       //b3
-      TEST_AREA_END,                          //b4
-      0,                                      //istart
-      TEST_AREA_END - 2 * EEPROM_PAGE_SIZE,   //ilen
-      FALSE,                                  //iring
-      0x33,                                   //pattern
-      FALSE,                                  //pat_autoinc
-      sdp);
-  if (chThdShouldTerminate()){goto END;}
+
+  uint32_t b1, b2, b3, b4, istart, ilen;
+  uint8_t pattern = 0x55;
+  b1 = TEST_AREA_START;
+  b2 = TEST_AREA_START + EEPROM_PAGE_SIZE;
+  b3 = TEST_AREA_END - EEPROM_PAGE_SIZE;
+  b4 = TEST_AREA_END;
+  istart = 0;
+  ilen = b3-b2;
+
+  cli_println("    Linear barriers testing.");
+//  chThdSleepMilliseconds(20);
+//  overflow_check(
+//      b1,
+//      b2,
+//      b3,
+//      b4,
+//      istart,
+//      ilen,
+//      FALSE,  //iring
+//      pattern,   //pattern
+//      FALSE,  //pat_autoinc
+//      sdp);
+//  if (chThdShouldTerminate()){goto END;}
+//  pattern++;
+//
+//  overflow_check(
+//      b1,
+//      b2,
+//      b3,
+//      b4,
+//      istart + 1,
+//      ilen - 1,
+//      FALSE,  //iring
+//      pattern,   //pattern
+//      FALSE,  //pat_autoinc
+//      sdp);
+//  if (chThdShouldTerminate()){goto END;}
+//  pattern++;
+//
+//  overflow_check(
+//      b1,
+//      b2,
+//      b3,
+//      b4,
+//      istart + 1,
+//      ilen,
+//      FALSE,  //iring
+//      pattern,   //pattern
+//      FALSE,  //pat_autoinc
+//      sdp);
+//  if (chThdShouldTerminate()){goto END;}
+//  pattern++;
+//
+//  overflow_check(
+//      b1,
+//      b2,
+//      b3,
+//      b4,
+//      istart + 1,
+//      ilen + 23,
+//      FALSE,  //iring
+//      pattern,   //pattern
+//      FALSE,  //pat_autoinc
+//      sdp);
+//  if (chThdShouldTerminate()){goto END;}
+//  pattern++;
+//
+//  overflow_check(
+//      b1,
+//      b2 - 1,
+//      b3 + 1,
+//      b4,
+//      istart,
+//      ilen,
+//      FALSE,  //iring
+//      pattern,   //pattern
+//      FALSE,  //pat_autoinc
+//      sdp);
+//  if (chThdShouldTerminate()){goto END;}
+//  pattern++;
+//
+//  overflow_check(
+//      b1,
+//      b2 - 2,
+//      b3 + 2,
+//      b4,
+//      istart + 2,
+//      ilen,
+//      FALSE,  //iring
+//      pattern,   //pattern
+//      FALSE,  //pat_autoinc
+//      sdp);
+//  if (chThdShouldTerminate()){goto END;}
+//  pattern++;
+//
+//  overflow_check(
+//      b1,
+//      b2 - 1,
+//      b3 + 1,
+//      b4,
+//      istart + 1,
+//      ilen + 23,
+//      FALSE,  //iring
+//      pattern,   //pattern
+//      FALSE,  //pat_autoinc
+//      sdp);
+//  if (chThdShouldTerminate()){goto END;}
+//  pattern++;
+//
+//  overflow_check(
+//      b1,
+//      b2 - 2,
+//      b3 + 2,
+//      b4,
+//      istart + 1,
+//      ilen + 23,
+//      FALSE,  //iring
+//      pattern,   //pattern
+//      FALSE,  //pat_autoinc
+//      sdp);
+//  if (chThdShouldTerminate()){goto END;}
+//  pattern++;
+//
+//  overflow_check(
+//      b1,
+//      b2 + 2,
+//      b3 - 3,
+//      b4,
+//      istart + 2,
+//      ilen,
+//      FALSE,  //iring
+//      pattern,   //pattern
+//      FALSE,  //pat_autoinc
+//      sdp);
+//  if (chThdShouldTerminate()){goto END;}
+//  pattern++;
+
+  /***************************************************************************/
+  cli_println("    Circular barriers testing.");
+
+  chThdSleepMilliseconds(20);
+//  overflow_check(
+//      b1,
+//      b2,
+//      b3,
+//      b4,
+//      istart,
+//      ilen,
+//      TRUE,  //iring
+//      pattern,   //pattern
+//      FALSE,  //pat_autoinc
+//      sdp);
+//  if (chThdShouldTerminate()){goto END;}
+//  pattern++;
+//
+//  overflow_check(
+//      b1,
+//      b2,
+//      b3,
+//      b4,
+//      istart + 1,
+//      ilen - 1,
+//      TRUE,  //iring
+//      pattern,   //pattern
+//      FALSE,  //pat_autoinc
+//      sdp);
+//  if (chThdShouldTerminate()){goto END;}
+//  pattern++;
 
   overflow_check(
-      TEST_AREA_START,                        //b1
-      TEST_AREA_START + EEPROM_PAGE_SIZE,     //b2
-      TEST_AREA_END - EEPROM_PAGE_SIZE,       //b3
-      TEST_AREA_END,                          //b4
-      0,                                      //istart
-      TEST_AREA_END - 2 * EEPROM_PAGE_SIZE,   //ilen
-      FALSE,                                  //iring
-      0x00,                                   //pattern
-      TRUE,                                   //pat_autoinc
+      b1,
+      b2,
+      b3,
+      b4,
+      istart + 5,
+      ilen,
+      TRUE,  //iring
+      pattern,   //pattern
+      FALSE,  //pat_autoinc
       sdp);
   if (chThdShouldTerminate()){goto END;}
+  pattern++;
 
   overflow_check(
-      TEST_AREA_START,                        //b1
-      TEST_AREA_START + EEPROM_PAGE_SIZE,     //b2
-      TEST_AREA_END - EEPROM_PAGE_SIZE,       //b3
-      TEST_AREA_END,                          //b4
-      1,                                      //istart
-      TEST_AREA_END - 1 - 2 * EEPROM_PAGE_SIZE,   //ilen
-      FALSE,                                  //iring
-      0xAA,                                   //pattern
-      FALSE,                                  //pat_autoinc
+      b1,
+      b2,
+      b3,
+      b4,
+      istart + 1,
+      ilen + 23,
+      TRUE,  //iring
+      pattern,   //pattern
+      FALSE,  //pat_autoinc
       sdp);
   if (chThdShouldTerminate()){goto END;}
+  pattern++;
+
+  overflow_check(
+      b1,
+      b2 - 1,
+      b3 + 1,
+      b4,
+      istart,
+      ilen,
+      TRUE,  //iring
+      pattern,   //pattern
+      FALSE,  //pat_autoinc
+      sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
+
+  overflow_check(
+      b1,
+      b2 - 2,
+      b3 + 2,
+      b4,
+      istart + 2,
+      ilen,
+      TRUE,  //iring
+      pattern,   //pattern
+      FALSE,  //pat_autoinc
+      sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
+
+  overflow_check(
+      b1,
+      b2 - 1,
+      b3 + 1,
+      b4,
+      istart + 1,
+      ilen + 23,
+      TRUE,  //iring
+      pattern,   //pattern
+      FALSE,  //pat_autoinc
+      sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
+
+  overflow_check(
+      b1,
+      b2 - 2,
+      b3 + 2,
+      b4,
+      istart + 1,
+      ilen + 23,
+      TRUE,  //iring
+      pattern,   //pattern
+      FALSE,  //pat_autoinc
+      sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
+
+  overflow_check(
+      b1,
+      b2 + 2,
+      b3 - 3,
+      b4,
+      istart + 2,
+      ilen,
+      TRUE,  //iring
+      pattern,   //pattern
+      FALSE,  //pat_autoinc
+      sdp);
+  if (chThdShouldTerminate()){goto END;}
+  pattern++;
+
+
 
 
 

@@ -134,7 +134,8 @@ static msg_t eeprom_write(const I2CEepromFileConfig *i2efcp, uint32_t offset,
 
   chDbgCheck(((len <= i2efcp->size) && ((offset+len) <= i2efcp->size)),
              "out of device bounds");
-  chDbgCheck(((offset / i2efcp->pagesize) == ((offset + len - 1) / i2efcp->pagesize)),
+  chDbgCheck((((offset + i2efcp->barrier_low) / i2efcp->pagesize) ==
+             (((offset + i2efcp->barrier_low) + len - 1) / i2efcp->pagesize)),
              "data can not be fitted in single page");
 
   /* write address bytes */
