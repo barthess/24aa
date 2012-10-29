@@ -258,22 +258,19 @@ EepromFileStream* EepromFileOpen(EepromFileStream* efs, const I2CEepromFileConfi
 
 uint8_t EepromReadByte(EepromFileStream *EepromFile_p){
   uint8_t buf[1];
-  size_t status = chFileStreamRead(EepromFile_p, buf, sizeof(buf));
-  chDbgAssert(status == sizeof(buf), "EepromReadByte(), #1", "read failed");
+  chFileStreamRead(EepromFile_p, buf, sizeof(buf));
   return buf[0];
 }
 
 uint16_t EepromReadHalfword(EepromFileStream *EepromFile_p){
   uint8_t buf[2];
-  size_t status = chFileStreamRead(EepromFile_p, buf, sizeof(buf));
-  chDbgAssert(status == sizeof(buf), "EepromReadByte(), #1", "read failed");
+  chFileStreamRead(EepromFile_p, buf, sizeof(buf));
   return (buf[0] << 8) | buf[1];
 }
 
 uint32_t EepromReadWord(EepromFileStream *EepromFile_p){
   uint8_t buf[4];
-  size_t status = chFileStreamRead(EepromFile_p, buf, sizeof(buf));
-  chDbgAssert(status == sizeof(buf), "EepromReadByte(), #1", "read failed");
+  chFileStreamRead(EepromFile_p, buf, sizeof(buf));
   return (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
 }
 
