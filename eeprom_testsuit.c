@@ -15,6 +15,7 @@ The work is provided "as is" without warranty of any kind, neither express nor i
 
 #include "eeprom_conf.h"
 
+#if USE_EEPROM_TEST_SUIT
 /*
  ******************************************************************************
  * DEFINES
@@ -382,3 +383,4 @@ Thread* eepromtest_clicmd(int argc, const char * const * argv, SerialDriver *sdp
   return eeprom_tp;
 }
 
+#endif /* USE_EEPROM_TEST_SUIT */
