@@ -13,6 +13,7 @@ EEPROM like a regular file(s).
 3. USAGE
 
 * Include eeprom.h file to your project.
+* Create eeprom_conf.h (sample included) in your project.
 * Define file object of a EepromFileStream type
   and config structure for it.
 * Open them with EepromOpen() function.

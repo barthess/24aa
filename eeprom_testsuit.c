@@ -4,7 +4,6 @@ You may use this work without restrictions, as long as this notice is included.
 The work is provided "as is" without warranty of any kind, neither express nor implied.
 */
 
-#include <stdlib.h>
 #include <string.h>
 
 #include "ch.h"
@@ -14,30 +13,16 @@ The work is provided "as is" without warranty of any kind, neither express nor i
 #include "cli.h"
 #include "chprintf.h"
 
+#include "eeprom_conf.h"
+
 /*
  ******************************************************************************
  * DEFINES
  ******************************************************************************
  */
-#define EEPROM_PAGE_SIZE    128
-#define EEPROM_SIZE         65536
-#define EEPROM_I2C_ADDR     0b1010000
-#define EEPROM_WRITE_TIME   20
-#define EEPROM_TX_DEPTH     (EEPROM_PAGE_SIZE + 2)
-#define EEPROM_I2CD         (&I2CD2)
 #define TEST_AREA_START     1024
 #define TEST_AREA_SIZE      1024
 #define TEST_AREA_END       (TEST_AREA_START + TEST_AREA_SIZE)
-
-//#define EEPROM_PAGE_SIZE    32
-//#define EEPROM_SIZE         4096
-//#define EEPROM_I2C_ADDR     0b1010000
-//#define EEPROM_WRITE_TIME   5
-//#define EEPROM_TX_DEPTH     (EEPROM_PAGE_SIZE + 2)
-//#define EEPROM_I2CD         (&I2CD1)
-//#define TEST_AREA_START     1024
-//#define TEST_AREA_SIZE      1024
-//#define TEST_AREA_END       (TEST_AREA_START + TEST_AREA_SIZE)
 
 /* shortcut to print OK message*/
 #define OK(); do{cli_println(" ... OK"); chThdSleepMilliseconds(20);}while(0)
@@ -66,23 +51,24 @@ static EepromFileStream ifile;
 static EepromFileStream ofile;
 
 static I2CEepromFileConfig ocfg = {
-  EEPROM_I2CD,
+  &EEPROM_I2CD,
   0,
   0,
   EEPROM_SIZE,
   EEPROM_PAGE_SIZE,
   EEPROM_I2C_ADDR,
-  MS2ST(EEPROM_WRITE_TIME),
+  MS2ST(EEPROM_WRITE_TIME_MS),
   o_buf,
 };
+
 static I2CEepromFileConfig icfg = {
-  EEPROM_I2CD,
+  &EEPROM_I2CD,
   0,
   0,
   EEPROM_SIZE,
   EEPROM_PAGE_SIZE,
   EEPROM_I2C_ADDR,
-  MS2ST(EEPROM_WRITE_TIME),
+  MS2ST(EEPROM_WRITE_TIME_MS),
   i_buf,
 };
 
@@ -148,11 +134,9 @@ static void pattern_fill(EepromFileStream *EfsTest, uint8_t pattern){
  *       |<--------- outer file ------------>|
  *       |                                   |
  * ======b1==b2========================b3===b4======
- *           |                          |
- *           |<------ inner file ------>|
- *
- *    bp = referencebuf + (b2 - b1) + istart;
-        while (bp < referencebuf + b3){
+ * |         |                          |          |
+ * |         |<------ inner file ------>|          |
+ * |<----------------- EEPROM -------------------->|
  */
 static void overflow_check(uint32_t b1, uint32_t b2, uint32_t b3, uint32_t b4,
                           uint32_t istart, uint32_t ilen,
@@ -397,5 +381,4 @@ Thread* eepromtest_clicmd(int argc, const char * const * argv, SerialDriver *sdp
     chDbgPanic("Can not allocate memory");
   return eeprom_tp;
 }
-
 
