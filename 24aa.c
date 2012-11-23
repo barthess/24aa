@@ -37,6 +37,11 @@ expected.
  * DEFINES
  ******************************************************************************
  */
+#if defined(SAM7_PLATFORM)
+#define EEPROM_I2C_CLOCK (MCK / (((i2cp->config->cwgr & 0xFF) + ((i2cp->config->cwgr >> 8) & 0xFF)) * (1 << ((i2cp->config->cwgr >> 16) & 7)) + 6))
+#else
+#define EEPROM_I2C_CLOCK (i2cp->config->clock_speed)
+#endif
 
 /*
  ******************************************************************************
@@ -79,7 +84,7 @@ static systime_t calc_timeout(I2CDriver *i2cp, size_t txbytes, size_t rxbytes){
   const uint32_t bitsinbyte = 10;
   uint32_t tmo;
   tmo = ((txbytes + rxbytes + 1) * bitsinbyte * 1000);
-  tmo /= i2cp->config->clock_speed;
+  tmo /= EEPROM_I2C_CLOCK;
   tmo += 10; /* some additional milliseconds to be safer */
   return MS2ST(tmo);
 }
