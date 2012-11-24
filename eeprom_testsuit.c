@@ -21,8 +21,8 @@ The work is provided "as is" without warranty of any kind, neither express nor i
  * DEFINES
  ******************************************************************************
  */
-#define TEST_AREA_START     1024
-#define TEST_AREA_SIZE      1024
+#define TEST_AREA_START     0
+#define TEST_AREA_SIZE      8192
 #define TEST_AREA_END       (TEST_AREA_START + TEST_AREA_SIZE)
 
 /* shortcut to print OK message*/
@@ -221,7 +221,7 @@ static void overflow_check(uint32_t b1, uint32_t b2, uint32_t b3, uint32_t b4,
  *
  */
 static WORKING_AREA(EepromTestThreadWA, 1024);
-static msg_t EepromTestThread(void *sdp){
+msg_t EepromTestThread(void *sdp){
   chRegSetThreadName("EepromTst");
 
   cli_println("basic tests");

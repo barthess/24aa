@@ -247,7 +247,7 @@ EepromFileStream* EepromFileOpen(EepromFileStream* efs, const I2CEepromFileConfi
   chDbgCheck(efs->vmt != &vmt, "file allready opened");
   chDbgCheck(eeprom_cfg->barrier_hi > eeprom_cfg->barrier_low, "wrong barriers")
   chDbgCheck(eeprom_cfg->pagesize < eeprom_cfg->size, "pagesize can not be lager than EEPROM size")
-  chDbgCheck(eeprom_cfg->barrier_hi < eeprom_cfg->size, "barrier out of bounds")
+  chDbgCheck(eeprom_cfg->barrier_hi <= eeprom_cfg->size, "barrier out of bounds")
 
   efs->vmt = &vmt;
   efs->cfg = eeprom_cfg;
