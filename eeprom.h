@@ -106,14 +106,19 @@ struct EepromFileStream {
  */
 #define chFileStreamWrite(ip, bp, n) (chSequentialStreamWrite(ip, bp, n))
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+  EepromFileStream* EepromFileOpen(EepromFileStream* efs, const I2CEepromFileConfig *eeprom_cfg);
 
-EepromFileStream* EepromFileOpen(EepromFileStream* efs, const I2CEepromFileConfig *eeprom_cfg);
-
-uint8_t  EepromReadByte(EepromFileStream *EepromFile_p);
-uint16_t EepromReadHalfword(EepromFileStream *EepromFile_p);
-uint32_t EepromReadWord(EepromFileStream *EepromFile_p);
-size_t EepromWriteByte(EepromFileStream *EepromFile_p, uint8_t data);
-size_t EepromWriteHalfword(EepromFileStream *EepromFile_p, uint16_t data);
-size_t EepromWriteWord(EepromFileStream *EepromFile_p, uint32_t data);
+  uint8_t  EepromReadByte(EepromFileStream *EepromFile_p);
+  uint16_t EepromReadHalfword(EepromFileStream *EepromFile_p);
+  uint32_t EepromReadWord(EepromFileStream *EepromFile_p);
+  size_t EepromWriteByte(EepromFileStream *EepromFile_p, uint8_t data);
+  size_t EepromWriteHalfword(EepromFileStream *EepromFile_p, uint16_t data);
+  size_t EepromWriteWord(EepromFileStream *EepromFile_p, uint32_t data);
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* EEPROM_FILE_H_ */
