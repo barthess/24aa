@@ -47,13 +47,26 @@ typedef struct I2CEepromFileConfig_2 {
    * Pointer to write buffer. The safest size is (pagesize + 2)
    */
   uint8_t     *write_buf;
-}I2CEepromFileConfig;
+}I2CEepromFileConfig_2;
 
 
 
 class myEepromFile : public chibios_fs::BaseFileStreamInterface{
 public:
+  myEepromFile(const I2CEepromFileConfig_2 *cfg);
+  uint32_t getAndClearLastError(void);
   fileoffset_t getSize(void);
+  fileoffset_t getPosition(void);
+  uint32_t setPosition(fileoffset_t offset);
+
+  size_t write(const uint8_t *bp, size_t n);
+  size_t read(uint8_t *bp, size_t n);
+  msg_t put(uint8_t b);
+  msg_t get(void);
+
+private:
+  const I2CEepromFileConfig_2 *cfg;
+  fileoffset_t offset;
 };
 
 
