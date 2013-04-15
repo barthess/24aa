@@ -75,11 +75,11 @@ void EepromFs::toc2buf(const toc_record_t *toc, uint8_t *b){
 
   n = EEPROM_FS_TOC_NAME_SIZE;
   b[n++] = (toc->inode.startpage >> 8)  & 0xFF;
-  b[n++] = toc->inode.startpage & 0xFF;
+  b[n++] =  toc->inode.startpage & 0xFF;
   b[n++] = (toc->inode.pageoffset >> 8) & 0xFF;
-  b[n++] = toc->inode.pageoffset & 0xFF;
+  b[n++] =  toc->inode.pageoffset & 0xFF;
   b[n++] = (toc->inode.size >> 8) & 0xFF;
-  b[n++] = toc->inode.size & 0xFF;
+  b[n++] =  toc->inode.size & 0xFF;
 }
 
 /**
@@ -106,10 +106,12 @@ void EepromFs::buf2toc(const uint8_t *b, toc_record_t *toc){
 /**
  *
  */
-size_t EepromFs::inode2absoffset(inodeid_t inodeid, fileoffset_t tip){
+size_t EepromFs::inode2absoffset(const inode_t *inode, fileoffset_t tip){
   size_t absoffset;
-  absoffset =  inode_table[inodeid].startpage * mtd->getPageSize();
-  absoffset += inode_table[inodeid].pageoffset + tip;
+//  absoffset =  inode_table[inodeid].startpage * mtd->getPageSize();
+//  absoffset += inode_table[inodeid].pageoffset + tip;
+  absoffset =  inode->startpage * mtd->getPageSize();
+  absoffset += inode->pageoffset + tip;
   return absoffset;
 }
 
@@ -155,20 +157,53 @@ void EepromFs::mkfs(void){
 /**
  *
  */
-bool EepromFs::fsck(void){
-  int32_t i = 0;
+void EepromFs::read_toc_record(uint32_t N, toc_record_t *rec){
   msg_t status = RDY_RESET;
   uint8_t bp[EEPROM_FS_TOC_RECORD_SIZE] = {};
   size_t absoffset;
 
+  absoffset = EEPROM_FS_TOC_RECORD_SIZE * N;
+  status = mtd->read(bp, absoffset, EEPROM_FS_TOC_RECORD_SIZE);
+  chDbgCheck(RDY_OK == status, "MTD broken");
+
+  buf2toc(bp, rec);
+}
+
+/**
+ *
+ */
+bool EepromFs::fsck(void){
+  int32_t i = 0, n = 0;
+  toc_record_t rec;
+
+  /* check name collisions in reference TOC */
+  for (n=0; n<EEPROM_FS_MAX_FILE_COUNT; n++){
+    for (i=n+1; i<EEPROM_FS_MAX_FILE_COUNT; i++){
+      if (0 != strcmp(reftoc[n].name, reftoc[i].name))
+        chDbgPanic("name collision in reference TOC");
+    }
+  }
+
+  /* check correspondace of names in reference TOC and last actual TOC in EEPROM */
   for (i=0; i<EEPROM_FS_MAX_FILE_COUNT; i++){
-    absoffset = EEPROM_FS_TOC_RECORD_SIZE * i;
-    status = mtd->read(bp, absoffset, EEPROM_FS_TOC_RECORD_SIZE);
-    chDbgCheck(RDY_OK == status, "MTD broken");
-    if (0 != strcmp(reftoc[i].name, (const char*)bp))
+    read_toc_record(i, &rec);
+    if (0 != strcmp(reftoc[i].name, rec.name))
       return CH_FAILED;
   }
   return CH_SUCCESS;
+}
+
+/**
+ *
+ */
+bool EepromFs::overlap(const inode_t *inode0, const inode_t *inode1){
+  size_t absoffset0 = inode2absoffset(inode0, 0);
+  size_t absoffset1 = inode2absoffset(inode1, 0);
+
+  if ((absoffset0 + inode0->size) > absoffset1)
+    return true;
+  else
+    return false;
 }
 
 /*
@@ -177,11 +212,30 @@ bool EepromFs::fsck(void){
  ******************************************************************************
  */
 
-EepromFs::EepromFs(EepromMtd *mtd, const toc_record_t *reftoc){
+EepromFs::EepromFs(EepromMtd *mtd, const toc_record_t *reftoc, size_t N){
+  chDbgCheck(((NULL != mtd) && (NULL != reftoc) && (0 != N)), "");
+  chDbgCheck(EEPROM_FS_MAX_FILE_COUNT == N, "");
+
   this->ready = false;
   this->mtd = mtd;
   this->reftoc = reftoc;
-  chDbgPanic("validate TOC here (overlaping and etc.)");
+
+  /* check inode overlapping in reference TOC */
+  uint32_t i = 0;
+  inode_t inode_toc; /* inode storing TOC */
+  inode_toc.startpage = 0;
+  inode_toc.pageoffset = 0;
+  inode_toc.size = EEPROM_FS_TOC_SIZE;
+
+  const inode_t *inode0 = &inode_toc;
+  const inode_t *inode1 = &(reftoc[0].inode);
+
+  for (i=1; i<N; i++){
+    if (overlap(inode0, inode1))
+      chDbgPanic("Inodes can not ovelap");
+    inode0 = inode1;
+    inode1 = &(reftoc[i].inode);
+  }
 }
 
 /**
@@ -189,23 +243,19 @@ EepromFs::EepromFs(EepromMtd *mtd, const toc_record_t *reftoc){
  */
 void EepromFs::mount(void){
   uint32_t i = 0;
-  msg_t status = RDY_RESET;
-  uint8_t bp[EEPROM_FS_TOC_RECORD_SIZE] = {};
-  size_t absoffset;
-  toc_record_t toc;
+  toc_record_t rec;
 
-  if (CH_FAILED == this->fsck())
+  if (CH_FAILED == this->fsck()){
     this->mkfs();
+    if (CH_FAILED == this->fsck())
+      chDbgPanic("fsck can not fix errors");
+  }
 
   for (i=0; i<EEPROM_FS_MAX_FILE_COUNT; i++){
-    absoffset = EEPROM_FS_TOC_RECORD_SIZE * i;
-    status = mtd->read(bp, absoffset, EEPROM_FS_TOC_RECORD_SIZE);
-    chDbgCheck(RDY_OK == status, "MTD broken");
-
-    buf2toc(bp, &toc);
-    inode_table[i].size       = toc.inode.size;
-    inode_table[i].pageoffset = toc.inode.pageoffset;
-    inode_table[i].startpage  = toc.inode.startpage;
+    read_toc_record(i, &rec);
+    inode_table[i].size       = rec.inode.size;
+    inode_table[i].pageoffset = rec.inode.pageoffset;
+    inode_table[i].startpage  = rec.inode.startpage;
   }
 
   this->ready = true;
@@ -224,10 +274,18 @@ size_t EepromFs::getSize(inodeid_t inodeid){
  *
  */
 inodeid_t EepromFs::findInode(const uint8_t *name){
-  (void)name;
+  uint32_t i = 0;
+  toc_record_t rec;
+
   chDbgCheck(true == this->ready, "Not ready");
-  chDbgPanic("unrealized");
-  return 0;
+
+  for (i=0; i<EEPROM_FS_MAX_FILE_COUNT; i++){
+    read_toc_record(i, &rec);
+    if (0 == strcmp((const char*)name, rec.name))
+      return i;
+  }
+
+  return -1; // nothing was found
 }
 
 /**
@@ -251,7 +309,7 @@ size_t EepromFs::write(const uint8_t *bp, size_t n,
   chDbgCheck(true == this->ready, "Not ready");
   chDbgCheck(((tip + n) <= inode_table[inodeid].size), "Overflow error");
 
-  absoffset = inode2absoffset(inodeid, tip);
+  absoffset = inode2absoffset(&(inode_table[inodeid]), tip);
 
   pagesize  =  mtd->getPageSize();
   firstpage =  absoffset / pagesize;
@@ -306,7 +364,7 @@ size_t EepromFs::read(uint8_t *bp, size_t n, inodeid_t inodeid, fileoffset_t tip
   chDbgCheck(true == this->ready, "Not ready");
   chDbgCheck(((tip + n) <= inode_table[inodeid].size), "Overflow error");
 
-  absoffset = inode2absoffset(inodeid, tip);
+  absoffset = inode2absoffset(&(inode_table[inodeid]), tip);
 
   /* Stupid I2C cell in STM32F1x does not allow to read single byte.
      So we must read 2 bytes and return needed one. */

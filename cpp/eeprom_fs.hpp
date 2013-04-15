@@ -4,12 +4,7 @@
 #include "ch.hpp"
 #include "hal.h"
 #include "eeprom_mtd.hpp"
-
-
-#define EEPROM_FS_TOC_SIZE          256
-#define EEPROM_FS_TOC_RECORD_SIZE   16
-#define EEPROM_FS_TOC_NAME_SIZE     10
-#define EEPROM_FS_MAX_FILE_COUNT    2
+#include "eeprom_fs_conf.h"
 
 /**
  *
@@ -37,7 +32,6 @@ typedef struct toc_record_t{
   inode_t inode;
 }toc_record_t;
 
-
 /**
  * type representing index in inode table
  */
@@ -51,7 +45,7 @@ public:
   /**
    * Constructor
    */
-  EepromFs(EepromMtd *mtd, const toc_record_t *reftoc);
+  EepromFs(EepromMtd *mtd, const toc_record_t *reftoc, size_t N);
   /**
    * Read inode table from EEPROM to RAM
    */
@@ -77,7 +71,7 @@ public:
 
 private:
    /**
-   * Mass erase EEPROM and write TOC hardcoded to firmware
+   * Mass erase EEPROM and write TOC hardcoded in firmware
    */
   void mkfs(void);
   /**
@@ -101,7 +95,15 @@ private:
   /**
    *
    */
-  size_t inode2absoffset(inodeid_t inodeid, fileoffset_t tip);
+  size_t inode2absoffset(const inode_t *inode, fileoffset_t tip);
+  /**
+   *
+   */
+  bool overlap(const inode_t *inode0, const inode_t *inode1);
+  /**
+   *
+   */
+  void read_toc_record(uint32_t N, toc_record_t *rec);
   /**
    *
    */
