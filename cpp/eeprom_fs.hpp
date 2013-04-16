@@ -1,8 +1,6 @@
 #ifndef EEPROM_FS_HPP_
 #define EEPROM_FS_HPP_
 
-#include "ch.hpp"
-#include "hal.h"
 #include "eeprom_mtd.hpp"
 #include "eeprom_fs_conf.h"
 

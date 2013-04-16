@@ -174,20 +174,34 @@ void EepromFs::read_toc_record(uint32_t N, toc_record_t *rec){
  */
 bool EepromFs::fsck(void){
   int32_t i = 0, n = 0;
+  char namebuf[EEPROM_FS_TOC_NAME_SIZE];
   toc_record_t rec;
+  rec.name = namebuf;
 
   /* check name collisions in reference TOC */
   for (n=0; n<EEPROM_FS_MAX_FILE_COUNT; n++){
     for (i=n+1; i<EEPROM_FS_MAX_FILE_COUNT; i++){
-      if (0 != strcmp(reftoc[n].name, reftoc[i].name))
+      if (0 == strcmp(reftoc[n].name, reftoc[i].name))
         chDbgPanic("name collision in reference TOC");
     }
+  }
+
+  /* check name lengths */
+  for (n=0; n<EEPROM_FS_MAX_FILE_COUNT; n++){
+    if (EEPROM_FS_TOC_NAME_SIZE < strlen(reftoc[n].name))
+      chDbgPanic("name too long");
   }
 
   /* check correspondace of names in reference TOC and last actual TOC in EEPROM */
   for (i=0; i<EEPROM_FS_MAX_FILE_COUNT; i++){
     read_toc_record(i, &rec);
     if (0 != strcmp(reftoc[i].name, rec.name))
+      return CH_FAILED;
+    if (reftoc[i].inode.pageoffset != rec.inode.pageoffset)
+      return CH_FAILED;
+    if (reftoc[i].inode.size != rec.inode.size)
+      return CH_FAILED;
+    if (reftoc[i].inode.startpage != rec.inode.startpage)
       return CH_FAILED;
   }
   return CH_SUCCESS;
@@ -243,12 +257,14 @@ EepromFs::EepromFs(EepromMtd *mtd, const toc_record_t *reftoc, size_t N){
  */
 void EepromFs::mount(void){
   uint32_t i = 0;
+  char namebuf[EEPROM_FS_TOC_NAME_SIZE];
   toc_record_t rec;
+  rec.name = namebuf;
 
   if (CH_FAILED == this->fsck()){
     this->mkfs();
     if (CH_FAILED == this->fsck())
-      chDbgPanic("fsck can not fix errors");
+      chDbgPanic("mkfs created FS with errors");
   }
 
   for (i=0; i<EEPROM_FS_MAX_FILE_COUNT; i++){
@@ -275,7 +291,9 @@ size_t EepromFs::getSize(inodeid_t inodeid){
  */
 inodeid_t EepromFs::findInode(const uint8_t *name){
   uint32_t i = 0;
+  char namebuf[EEPROM_FS_TOC_NAME_SIZE];
   toc_record_t rec;
+  rec.name = namebuf;
 
   chDbgCheck(true == this->ready, "Not ready");
 

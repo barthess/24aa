@@ -29,7 +29,7 @@
  * GLOBAL VARIABLES
  ******************************************************************************
  */
-static const uint8_t erase_pattern[EEPROM_PAGE_SIZE] = {};
+static const uint8_t erasebuf[EEPROM_PAGE_SIZE] = {};
 
 /*
  ******************************************************************************
@@ -81,6 +81,7 @@ EepromMtd::EepromMtd(const EepromMtdConfig *cfg){
 msg_t EepromMtd::read(uint8_t *data, size_t absoffset, size_t len){
   msg_t status = RDY_RESET;
   systime_t tmo = calc_timeout(cfg->i2cp, 2, len);
+  volatile i2cflags_t flags;
 
   chDbgCheck(((len <= cfg->devsize) && ((absoffset + len) <= cfg->devsize)),
              "Transaction out of device bounds");
@@ -93,11 +94,14 @@ msg_t EepromMtd::read(uint8_t *data, size_t absoffset, size_t len){
 
   status = i2cMasterTransmitTimeout(cfg->i2cp, cfg->addr, writebuf,
                                     2, data, len, tmo);
+  if (RDY_OK != status)
+    flags = i2cGetErrors(cfg->i2cp);
 
   #if I2C_USE_MUTUAL_EXCLUSION
     i2cReleaseBus(cfg->i2cp);
   #endif
 
+  (void)flags;
   return status;
 }
 
@@ -159,11 +163,11 @@ msg_t EepromMtd::massErase(void){
   size_t absoffset = 0;
 
   while (absoffset < EEPROM_SIZE){
-    status = write(erase_pattern, absoffset, sizeof(erase_pattern));
+    status = write(erasebuf, absoffset, sizeof(erasebuf));
     if (RDY_OK != status)
       return status;
     else
-      absoffset += sizeof(erase_pattern);
+      absoffset += sizeof(erasebuf);
   }
 
   return status;

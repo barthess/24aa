@@ -7,11 +7,8 @@ The work is provided "as is" without warranty of any kind, neither express nor i
 #ifndef EEPROM_FILE_CPP_H_
 #define EEPROM_FILE_CPP_H_
 
-#include "ch.hpp"
 #include "fs.hpp"
-#include "hal.h"
 #include "eeprom_fs.hpp"
-
 
 class EepromFile : public chibios_fs::BaseFileStreamInterface{
 public:
@@ -26,6 +23,8 @@ public:
   msg_t put(uint8_t b);
   msg_t get(void);
 
+  uint32_t readWord(void);
+  size_t writeWord(uint32_t data);
   bool open(EepromFs *fs, uint8_t *name);
   void close(void);
 

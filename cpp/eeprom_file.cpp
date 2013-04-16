@@ -180,3 +180,29 @@ size_t EepromFile::write(const uint8_t *bp, size_t n){
   tip += transferred;
   return transferred;
 }
+
+/**
+ *
+ */
+uint32_t EepromFile::readWord(void){
+  uint8_t buf[4];
+  read(buf, sizeof(buf));
+  return (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
+}
+
+/**
+ *
+ */
+size_t EepromFile::writeWord(uint32_t data){
+  uint8_t buf[4];
+  buf[0] = (data >> 24) & 0xFF;
+  buf[1] = (data >> 16) & 0xFF;
+  buf[2] = (data >> 8)  & 0xFF;
+  buf[3] =  data        & 0xFF;
+  return write(buf, sizeof(buf));
+}
+
+
+
+
+

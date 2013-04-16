@@ -3,7 +3,7 @@
 
 #include "ch.hpp"
 #include "hal.h"
-#include "eeprom_conf.h"
+#include "eeprom_mtd_conf.h"
 
 typedef uint16_t eeprom_size_t;
 
