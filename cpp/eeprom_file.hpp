@@ -30,7 +30,6 @@ public:
 
 private:
   size_t clamp_size(size_t n);
-  bool ready;
   EepromFs *fs;
   /**
    * Current position in bytes relative to file start

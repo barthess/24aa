@@ -72,7 +72,6 @@ uint32_t EepromFile::getAndClearLastError(void){
  */
 
 EepromFile::EepromFile(void){
-  this->ready = false;
   this->fs = NULL;
 }
 
@@ -95,15 +94,17 @@ bool EepromFile::open(EepromFs *fs, uint8_t *name){
   chDbgCheck(NULL != fs, "");
   chDbgCheck(NULL != name, "");
 
-  this->fs = fs;
+  if (NULL != this->fs) // Allready opened
+    return CH_FAILED;
 
   inodeid = fs->findInode(name);
   if (-1 != inodeid){
     tip = 0;
-    ready = true;
+    this->fs = fs;
+    return CH_SUCCESS;
   }
-
-  return ready;
+  else
+    return CH_FAILED;
 }
 
 /**
@@ -111,14 +112,13 @@ bool EepromFile::open(EepromFs *fs, uint8_t *name){
  */
 void EepromFile::close(void){
   this->fs = NULL;
-  ready = false;
 }
 
 /**
  *
  */
 fileoffset_t EepromFile::getSize(void){
-  chDbgCheck(true == ready, "File not opened");
+  chDbgCheck(NULL != this->fs, "File not opened");
   return fs->getSize(inodeid);
 }
 
@@ -126,7 +126,7 @@ fileoffset_t EepromFile::getSize(void){
  *
  */
 fileoffset_t EepromFile::getPosition(void){
-  chDbgCheck(true == ready, "File not opened");
+  chDbgCheck(NULL != this->fs, "File not opened");
   return tip;
 }
 
@@ -134,7 +134,7 @@ fileoffset_t EepromFile::getPosition(void){
  *
  */
 uint32_t EepromFile::setPosition(fileoffset_t offset){
-  chDbgCheck(true == ready, "File not opened");
+  chDbgCheck(NULL != this->fs, "File not opened");
 
   uint32_t size = getSize();
   if (offset >= size)
@@ -151,7 +151,7 @@ uint32_t EepromFile::setPosition(fileoffset_t offset){
 size_t EepromFile::read(uint8_t *bp, size_t n){
   size_t transferred;
 
-  chDbgCheck(true == ready, "File not opened");
+  chDbgCheck(NULL != this->fs, "File not opened");
   chDbgCheck(NULL != bp, "");
 
   n = clamp_size(n);
@@ -169,7 +169,7 @@ size_t EepromFile::read(uint8_t *bp, size_t n){
 size_t EepromFile::write(const uint8_t *bp, size_t n){
   size_t transferred;
 
-  chDbgCheck(true == ready, "File not opened");
+  chDbgCheck(NULL != this->fs, "File not opened");
   chDbgCheck(NULL != bp, "");
 
   n = clamp_size(n);
