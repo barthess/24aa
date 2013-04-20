@@ -202,6 +202,24 @@ size_t EepromFile::writeWord(uint32_t data){
   return write(buf, sizeof(buf));
 }
 
+/**
+ *
+ */
+uint16_t EepromFile::readHalfWord(void){
+  uint8_t buf[2];
+  read(buf, sizeof(buf));
+  return (buf[0] << 8) | buf[1];
+}
+
+/**
+ *
+ */
+size_t EepromFile::writeHalfWord(uint16_t data){
+  uint8_t buf[2];
+  buf[0] = (data >> 8)  & 0xFF;
+  buf[1] =  data        & 0xFF;
+  return write(buf, sizeof(buf));
+}
 
 
 
