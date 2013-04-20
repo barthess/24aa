@@ -220,7 +220,3 @@ size_t EepromFile::writeHalfWord(uint16_t data){
   buf[1] =  data        & 0xFF;
   return write(buf, sizeof(buf));
 }
-
-
-
-

@@ -24,8 +24,8 @@ public:
   msg_t get(void);
 
   uint32_t readWord(void);
-  size_t writeWord(uint32_t data);
   uint16_t readHalfWord(void);
+  size_t writeWord(uint32_t data);
   size_t writeHalfWord(uint16_t data);
   bool open(EepromFs *fs, uint8_t *name);
   void close(void);
