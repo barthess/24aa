@@ -225,7 +225,7 @@ bool EepromFs::overlap(const inode_t *inode0, const inode_t *inode1){
 
 EepromFs::EepromFs(EepromMtd *mtd, const toc_record_t *reftoc, size_t N){
   chDbgCheck(((NULL != mtd) && (NULL != reftoc) && (0 != N)), "");
-  chDbgCheck(EEPROM_FS_MAX_FILE_COUNT == N, "");
+  chDbgCheck(EEPROM_FS_MAX_FILE_COUNT >= N, "");
 
   this->files_opened = 0;
   this->mtd = mtd;
