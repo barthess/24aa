@@ -107,8 +107,6 @@ void EepromFs::buf2toc(const uint8_t *b, toc_record_t *toc){
  */
 size_t EepromFs::inode2absoffset(const inode_t *inode, fileoffset_t tip){
   size_t absoffset;
-//  absoffset =  inode_table[inodeid].startpage * mtd->getPageSize();
-//  absoffset += inode_table[inodeid].pageoffset + tip;
   absoffset =  inode->startpage * mtd->getPageSize();
   absoffset += inode->pageoffset + tip;
   return absoffset;
@@ -229,7 +227,7 @@ EepromFs::EepromFs(EepromMtd *mtd, const toc_record_t *reftoc, size_t N){
   chDbgCheck(((NULL != mtd) && (NULL != reftoc) && (0 != N)), "");
   chDbgCheck(EEPROM_FS_MAX_FILE_COUNT == N, "");
 
-  this->ready = false;
+  this->files_opened = 0;
   this->mtd = mtd;
   this->reftoc = reftoc;
 
@@ -260,6 +258,8 @@ void EepromFs::mount(void){
   toc_record_t rec;
   rec.name = namebuf;
 
+  chDbgCheck((0 == this->files_opened), "FS already mounted");
+
   if (CH_FAILED == this->fsck()){
     this->mkfs();
     if (CH_FAILED == this->fsck())
@@ -273,14 +273,33 @@ void EepromFs::mount(void){
     inode_table[i].startpage  = rec.inode.startpage;
   }
 
-  this->ready = true;
+  this->files_opened = 1;
+}
+
+/**
+ * Use it with care
+ */
+bool EepromFs::umount(void){
+  if (0 == this->files_opened){ // not mounted yet
+    return CH_SUCCESS;
+  }
+  else if (1 == this->files_opened){
+    chSysLock();
+    this->files_opened = 0;
+    chSysUnlock();
+    return CH_SUCCESS;
+  }
+  else{
+    chDbgPanic("FS has opened files");
+    return CH_FAILED; //warning supressor
+  }
 }
 
 /**
  *
  */
 size_t EepromFs::getSize(inodeid_t inodeid){
-  chDbgCheck(true == this->ready, "Not ready");
+  chDbgCheck(this->files_opened > 0, "Not mounted");
   chDbgCheck(EEPROM_FS_MAX_FILE_COUNT > inodeid, "Overflow error");
   return this->inode_table[inodeid].size;
 }
@@ -288,21 +307,36 @@ size_t EepromFs::getSize(inodeid_t inodeid){
 /**
  *
  */
-inodeid_t EepromFs::findInode(const uint8_t *name){
+inodeid_t EepromFs::open(const uint8_t *name){
   uint32_t i = 0;
   char namebuf[EEPROM_FS_TOC_NAME_SIZE];
   toc_record_t rec;
   rec.name = namebuf;
 
-  chDbgCheck(true == this->ready, "Not ready");
+  chDbgCheck(this->files_opened > 0, "Not mounted");
 
   for (i=0; i<EEPROM_FS_MAX_FILE_COUNT; i++){
     read_toc_record(i, &rec);
-    if (0 == strcmp((const char*)name, rec.name))
+    if (0 == strcmp((const char*)name, rec.name)){
+      chSysLock();
+      this->files_opened++;
+      chSysUnlock();
       return i;
+    }
   }
 
   return -1; // nothing was found
+}
+
+/**
+ *
+ */
+bool EepromFs::close(inodeid_t inodeid){
+  (void)inodeid;
+  chSysLock();
+  this->files_opened--;
+  chSysUnlock();
+  return CH_SUCCESS;
 }
 
 /**
@@ -323,7 +357,7 @@ size_t EepromFs::write(const uint8_t *bp, size_t n,
   uint32_t lastpage;  /* last page to be affected during transaction */
   size_t   absoffset; /* absoulute offset in bytes relative to eeprom start */
 
-  chDbgCheck(true == this->ready, "Not ready");
+  chDbgCheck(this->files_opened > 0, "Not mounted");
   chDbgCheck(((tip + n) <= inode_table[inodeid].size), "Overflow error");
 
   absoffset = inode2absoffset(&(inode_table[inodeid]), tip);
@@ -378,7 +412,7 @@ size_t EepromFs::read(uint8_t *bp, size_t n, inodeid_t inodeid, fileoffset_t tip
   msg_t status = RDY_OK;
   size_t absoffset;
 
-  chDbgCheck(true == this->ready, "Not ready");
+  chDbgCheck(this->files_opened > 0, "Not mounted");
   chDbgCheck(((tip + n) <= inode_table[inodeid].size), "Overflow error");
 
   absoffset = inode2absoffset(&(inode_table[inodeid]), tip);

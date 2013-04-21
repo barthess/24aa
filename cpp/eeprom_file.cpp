@@ -97,7 +97,7 @@ bool EepromFile::open(EepromFs *fs, uint8_t *name){
   if (NULL != this->fs) // Allready opened
     return CH_FAILED;
 
-  inodeid = fs->findInode(name);
+  inodeid = fs->open(name);
   if (-1 != inodeid){
     tip = 0;
     this->fs = fs;
@@ -111,6 +111,7 @@ bool EepromFile::open(EepromFs *fs, uint8_t *name){
  *
  */
 void EepromFile::close(void){
+  fs->close(this->inodeid);
   this->fs = NULL;
 }
 

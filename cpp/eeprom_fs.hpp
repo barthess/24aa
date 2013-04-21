@@ -49,6 +49,10 @@ public:
    */
   void mount(void);
   /**
+   *
+   */
+  bool umount(void);
+  /**
    * Return size of file. Designed for use in higher level functions.
    */
   size_t getSize(inodeid_t inodeid);
@@ -56,7 +60,12 @@ public:
    * Return inode index in table for given name
    * -1 if not found
    */
-  inodeid_t findInode(const uint8_t *name);
+  inodeid_t open(const uint8_t *name);
+  /**
+   * Return inode index in table for given name
+   * -1 if not found
+   */
+  bool close(inodeid_t inodeid);
   /**
    * Designed to be called from higher level
    */
@@ -108,10 +117,12 @@ private:
   EepromMtd *mtd;
   /* reference table of content */
   const toc_record_t *reftoc;
-  /* denotes successfull mount */
-  bool ready;
   /**/
   inode_t inode_table[EEPROM_FS_MAX_FILE_COUNT];
+  /* counter of opened files. In unmounted state this value must be 0.
+   * After mounting it must be set to 1 denoting successful mount. Every
+   * 'open' operation must increment it and every 'close' must decrement it. */
+  uint8_t files_opened;
 };
 
 #endif /* EEPROM_FS_HPP_ */
