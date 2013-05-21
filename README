@@ -9,8 +9,10 @@ EEPROM like a regular file(s).
 
 * Only I2C.
 * Maximum capacity of EEPROM is 65536 bytes.
+* No 'RAID' like combining
 
-3. USAGE
+3. USAGE 
+3.1. C
 
 * Include eeprom.h file to your project.
 * Create eeprom_conf.h (sample included) in your project.
@@ -28,6 +30,9 @@ etc.
 Examples of usage and checking the returning parameter you can found in
 eeprom_testsuit.c
 
+3.2. CPP 
+Example of CPP code you can find in 'cpp_example' directory. Also 
+check 'eeprom_testsuit.cpp'.
 
 
 Author: Uladzimir Pylinski aka barthess (barthess@yandex.ru). 
