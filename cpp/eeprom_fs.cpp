@@ -417,34 +417,6 @@ size_t EepromFs::read(uint8_t *bp, size_t n, inodeid_t inodeid, fileoffset_t tip
 
   absoffset = inode2absoffset(&(inode_table[inodeid]), tip);
 
-  /* Stupid I2C cell in STM32F1x does not allow to read single byte.
-     So we must read 2 bytes and return needed one. */
-#if defined(STM32F1XX_I2C)
-  if (n == 1){
-    uint8_t __buf[2];
-    /* if NOT last byte of file requested */
-    if ((getposition(ip) + 1) < getsize(ip)){
-      if (read(ip, __buf, 2) == 2){
-        lseek(ip, (getposition(ip) + 1));
-        bp[0] = __buf[0];
-        return 1;
-      }
-      else
-        return 0;
-    }
-    else{
-      lseek(ip, (getposition(ip) - 1));
-      if (read(ip, __buf, 2) == 2){
-        lseek(ip, (getposition(ip) + 2));
-        bp[0] = __buf[1];
-        return 1;
-      }
-      else
-        return 0;
-    }
-  }
-#endif /* defined(STM32F1XX_I2C) */
-
   /* call low level function */
   status = mtd->read(bp, absoffset, n);
   if (status != RDY_OK)

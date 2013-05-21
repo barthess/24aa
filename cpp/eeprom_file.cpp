@@ -159,6 +159,37 @@ size_t EepromFile::read(uint8_t *bp, size_t n){
   if (0 == n)
     return 0;
 
+  /*
+   * Ugly workaround.
+   * Stupid I2C cell in STM32F1x does not allow to read single byte.
+   * So we must read 2 bytes and return needed one.
+   */
+#if defined(STM32F1XX_I2C)
+  if (n == 1){
+    uint8_t buf[2];
+    /* if NOT last byte of file requested */
+    if ((getPosition() + 1) < getSize()){
+      if (2 == read(buf, 2)){
+        setPosition(getPosition() + 1);
+        bp[0] = buf[0];
+        return 1;
+      }
+      else
+        return 0;
+    }
+    else{
+      setPosition(getPosition() - 1);
+      if (2 == read(buf, 2)){
+        setPosition(getPosition() + 2);
+        bp[0] = buf[1];
+        return 1;
+      }
+      else
+        return 0;
+    }
+  }
+#endif /* defined(STM32F1XX_I2C) */
+
   transferred = fs->read(bp, n, inodeid, tip);
   tip += transferred;
   return transferred;
