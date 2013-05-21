@@ -4,7 +4,7 @@
 #include "hal.h"
 #include "eeprom_file.hpp"
 
-#if USE_EEPROM_TEST_SUIT
+#if USE_EEPROM_TEST_SUITE
 /*
  ******************************************************************************
  * DEFINES
@@ -126,7 +126,7 @@ void uberunit(uint16_t sp, uint16_t off){
  ******************************************************************************
  */
 
-void EepromTestSuit(void){
+void EepromTestSuite(void){
   msg_t mtdstatus = RDY_RESET;
   mtdstatus = eemtd.massErase();
   chDbgCheck((RDY_OK == mtdstatus), "");
@@ -148,4 +148,4 @@ void EepromTestSuit(void){
   }
 }
 
-#endif /* USE_EEPROM_TEST_SUIT */
+#endif /* USE_EEPROM_TEST_SUITE */
