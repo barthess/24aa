@@ -1,7 +1,13 @@
 /*
-Copyright 2012 Uladzimir Pylinski aka barthess.
-You may use this work without restrictions, as long as this notice is included.
-The work is provided "as is" without warranty of any kind, neither express nor implied.
+    Abstraction layer for EEPROM ICs.
+
+    Copyright (C) 2012 Uladzimir Pylinski aka barthess
+
+    Licensed under the 3-Clause BSD license, (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://directory.fsf.org/wiki/License:BSD_3Clause
 */
 
 #ifndef EEPROM_FILE_CPP_H_
