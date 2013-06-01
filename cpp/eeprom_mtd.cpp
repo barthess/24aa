@@ -129,7 +129,7 @@ msg_t EepromMtd::read(uint8_t *data, size_t absoffset, size_t len){
 msg_t EepromMtd::write(const uint8_t *data, size_t absoffset, size_t len){
 
 #if defined(eeprom_led_on)
-  eeprom_led_on()
+  eeprom_led_on();
 #endif
 
   msg_t status = RDY_RESET;
@@ -162,7 +162,7 @@ msg_t EepromMtd::write(const uint8_t *data, size_t absoffset, size_t len){
   chThdSleep(cfg->writetime);
 
 #if defined(eeprom_led_off)
-  eeprom_led_off()
+  eeprom_led_off();
 #endif
 
   return status;
