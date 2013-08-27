@@ -74,7 +74,7 @@ static const toc_record_t reftoc[EEPROM_FS_MAX_FILE_COUNT] = {
 static const EepromMtdConfig mtd_cfg = {
   &I2CD2,
   MS2ST(EEPROM_WRITE_TIME_MS),
-  EEPROM_SIZE,
+  EEPROM_PAGES,
   EEPROM_PAGE_SIZE,
   EEPROM_I2C_ADDR,
 };

@@ -95,7 +95,7 @@ msg_t EepromMtd::read(uint8_t *data, size_t absoffset, size_t len){
   systime_t tmo = calc_timeout(cfg->i2cp, 2, len);
   volatile i2cflags_t flags;
 
-  chDbgCheck(((len <= cfg->devsize) && ((absoffset + len) <= cfg->devsize)),
+  chDbgCheck((absoffset + len) <= (cfg->pages * cfg->pagesize),
              "Transaction out of device bounds");
 
   eeprom_split_addr(writebuf, absoffset);
@@ -133,7 +133,7 @@ msg_t EepromMtd::write(const uint8_t *data, size_t absoffset, size_t len){
   msg_t status = RDY_RESET;
   systime_t tmo = calc_timeout(cfg->i2cp, (len + 2), 0);
 
-  chDbgCheck(((len <= cfg->devsize) && ((absoffset + len) <= cfg->devsize)),
+  chDbgCheck((absoffset + len) <= (cfg->pages * cfg->pagesize),
              "Transaction out of device bounds");
 
   chDbgCheck(((absoffset / cfg->pagesize) ==
@@ -177,7 +177,7 @@ msg_t EepromMtd::massErase(void){
   msg_t status = RDY_RESET;
   size_t absoffset = 0;
 
-  while (absoffset < EEPROM_SIZE){
+  while (absoffset < EEPROM_PAGES * EEPROM_PAGE_SIZE){
     status = write(erasebuf, absoffset, sizeof(erasebuf));
     if (RDY_OK != status)
       return status;

@@ -33,7 +33,7 @@ typedef struct EepromMtdConfig {
    * Size of memory array in pages.
    * Check datasheet!!!
    */
-  size_t        devsize;
+  size_t        pages;
   /**
    * Size of single page in bytes.
    * Check datasheet!!!

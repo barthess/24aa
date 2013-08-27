@@ -47,7 +47,7 @@
 static const EepromMtdConfig mtd_cfg = {
   &EEPROM_I2CD,
   MS2ST(EEPROM_WRITE_TIME_MS),
-  EEPROM_SIZE,
+  EEPROM_PAGES,
   EEPROM_PAGE_SIZE,
   EEPROM_I2C_ADDR,
 };
