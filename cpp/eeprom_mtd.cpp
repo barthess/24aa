@@ -41,7 +41,6 @@
  * GLOBAL VARIABLES
  ******************************************************************************
  */
-static const uint8_t erasebuf[EEPROM_PAGE_SIZE] = {};
 
 /*
  ******************************************************************************
@@ -176,7 +175,9 @@ size_t EepromMtd::getPageSize(void){
 msg_t EepromMtd::massErase(void){
   msg_t status = RDY_RESET;
   size_t absoffset = 0;
+  uint8_t erasebuf[EEPROM_PAGE_SIZE];
 
+  memset(erasebuf, 0xFF, sizeof(erasebuf));
   while (absoffset < EEPROM_PAGES * EEPROM_PAGE_SIZE){
     status = write(erasebuf, absoffset, sizeof(erasebuf));
     if (RDY_OK != status)
