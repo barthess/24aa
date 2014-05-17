@@ -78,7 +78,14 @@ static systime_t calc_timeout(I2CDriver *i2cp, size_t txbytes, size_t rxbytes){
  ******************************************************************************
  */
 
-EepromMtd::EepromMtd(const EepromMtdConfig *cfg){
+/**
+ * @brief   Constructor
+ */
+EepromMtd::EepromMtd(const EepromMtdConfig *cfg)
+#if (EEPROM_MTD_USE_MUTUAL_EXCLUSION && !CH_USE_MUTEXES)
+  : semaphore(1);
+#endif
+{
   this->cfg = cfg;
 }
 
@@ -97,6 +104,8 @@ msg_t EepromMtd::read(uint8_t *data, size_t absoffset, size_t len){
   chDbgCheck((absoffset + len) <= (cfg->pages * cfg->pagesize),
              "Transaction out of device bounds");
 
+  this->acquire();
+
   eeprom_split_addr(writebuf, absoffset);
 
   #if I2C_USE_MUTUAL_EXCLUSION
@@ -111,6 +120,8 @@ msg_t EepromMtd::read(uint8_t *data, size_t absoffset, size_t len){
   #if I2C_USE_MUTUAL_EXCLUSION
     i2cReleaseBus(cfg->i2cp);
   #endif
+
+  this->release();
 
   (void)flags;
   return status;
@@ -139,6 +150,8 @@ msg_t EepromMtd::write(const uint8_t *data, size_t absoffset, size_t len){
              ((absoffset + len - 1) / cfg->pagesize)),
              "Data can not be fitted in single page");
 
+  this->acquire();
+
   /* write address bytes */
   eeprom_split_addr(writebuf, absoffset);
   /* write data bytes */
@@ -158,6 +171,8 @@ msg_t EepromMtd::write(const uint8_t *data, size_t absoffset, size_t len){
   /* wait until EEPROM process data */
   chThdSleep(cfg->writetime);
   eeprom_led_off();
+
+  this->release();
 
   return status;
 }
@@ -190,3 +205,28 @@ msg_t EepromMtd::massErase(void){
 }
 
 
+/**
+ *
+ */
+void EepromMtd::acquire(void) {
+#if EEPROM_MTD_USE_MUTUAL_EXCLUSION
+#if CH_USE_MUTEXES
+  mutex.lock();
+#elif CH_USE_SEMAPHORES
+  semaphore.wait();
+#endif
+#endif /* EEPROM_MTD_USE_MUTUAL_EXCLUSION */
+}
+
+/**
+ *
+ */
+void EepromMtd::release(void) {
+#if EEPROM_MTD_USE_MUTUAL_EXCLUSION
+#if CH_USE_MUTEXES
+  chMtxUnlock();
+#elif CH_USE_SEMAPHORES
+  semaphore.signal();
+#endif
+#endif /* EEPROM_MTD_USE_MUTUAL_EXCLUSION */
+}

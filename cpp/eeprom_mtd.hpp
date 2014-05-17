@@ -19,6 +19,14 @@
 
 typedef uint16_t eeprom_size_t;
 
+#if !defined(EEPROM_MTD_USE_MUTUAL_EXCLUSION) || defined(__DOXYGEN__)
+#define EEPROM_MTD_USE_MUTUAL_EXCLUSION    FALSE
+#endif
+
+#if EEPROM_MTD_USE_MUTUAL_EXCLUSION && !CH_USE_MUTEXES && !CH_USE_SEMAPHORES
+#error "EEPROM_MTD_USE_MUTUAL_EXCLUSION requires CH_USE_MUTEXES and/or CH_USE_SEMAPHORES"
+#endif
+
 typedef struct EepromMtdConfig {
   /**
    * Driver connecte to IC.
@@ -43,7 +51,7 @@ typedef struct EepromMtdConfig {
    * Address of IC on I2C bus.
    */
   i2caddr_t     addr;
-}EepromBlkConfig;
+}EepromMtdConfig;
 
 
 class EepromMtd{
@@ -55,8 +63,18 @@ public:
   msg_t massErase(void);
 
 private:
+  void acquire(void);
+  void release(void);
   const EepromMtdConfig *cfg;
   uint8_t writebuf[EEPROM_PAGE_SIZE + 2];
+
+#if EEPROM_MTD_USE_MUTUAL_EXCLUSION
+#if CH_USE_MUTEXES
+  chibios_rt::Mutex             mutex;
+#elif CH_USE_SEMAPHORES
+  chibios_rt::CounterSemaphore  semaphore;
+#endif
+#endif /* EEPROM_MTD_USE_MUTUAL_EXCLUSION */
 };
 
 #endif /* EEPROM_MTD_HPP_ */
