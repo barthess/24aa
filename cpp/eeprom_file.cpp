@@ -97,8 +97,8 @@ size_t EepromFile::clamp_size(size_t n){
  *
  */
 bool EepromFile::open(EepromFs *fs, uint8_t *name){
-  chDbgCheck(NULL != fs, "");
-  chDbgCheck(NULL != name, "");
+  osalDbgCheck(NULL != fs);
+  osalDbgCheck(NULL != name);
 
   if (NULL != this->fs) // Allready opened
     return CH_FAILED;
@@ -125,7 +125,7 @@ void EepromFile::close(void){
  *
  */
 fileoffset_t EepromFile::getSize(void){
-  chDbgCheck(NULL != this->fs, "File not opened");
+  osalDbgAssert(NULL != this->fs, "File not opened");
   return fs->getSize(inodeid);
 }
 
@@ -133,7 +133,7 @@ fileoffset_t EepromFile::getSize(void){
  *
  */
 fileoffset_t EepromFile::getPosition(void){
-  chDbgCheck(NULL != this->fs, "File not opened");
+  osalDbgAssert(NULL != this->fs, "File not opened");
   return tip;
 }
 
@@ -141,7 +141,7 @@ fileoffset_t EepromFile::getPosition(void){
  *
  */
 uint32_t EepromFile::setPosition(fileoffset_t offset){
-  chDbgCheck(NULL != this->fs, "File not opened");
+  osalDbgAssert(NULL != this->fs, "File not opened");
 
   uint32_t size = getSize();
   if (offset >= size)
@@ -158,8 +158,8 @@ uint32_t EepromFile::setPosition(fileoffset_t offset){
 size_t EepromFile::read(uint8_t *bp, size_t n){
   size_t transferred;
 
-  chDbgCheck(NULL != this->fs, "File not opened");
-  chDbgCheck(NULL != bp, "");
+  osalDbgAssert(NULL != this->fs, "File not opened");
+  chDbgCheck(NULL != bp);
 
   n = clamp_size(n);
   if (0 == n)
@@ -207,8 +207,8 @@ size_t EepromFile::read(uint8_t *bp, size_t n){
 size_t EepromFile::write(const uint8_t *bp, size_t n){
   size_t transferred;
 
-  chDbgCheck(NULL != this->fs, "File not opened");
-  chDbgCheck(NULL != bp, "");
+  osalDbgAssert(NULL != this->fs, "File not opened");
+  osalDbgCheck(NULL != bp);
 
   n = clamp_size(n);
   if (0 == n)

@@ -10,19 +10,40 @@
         http://directory.fsf.org/wiki/License:BSD_3Clause
 */
 
-#include <string.h>
+/*****************************************************************************
+ * DATASHEET NOTES
+ *****************************************************************************
+Write cycle time (byte or page) — 5 ms
+
+Note:
+Page write operations are limited to writing
+bytes within a single physical page,
+regardless of the number of bytes
+actually being written. Physical page
+boundaries start at addresses that are
+integer multiples of the page buffer size (or
+‘page size’) and end at addresses that are
+integer multiples of [page size – 1]. If a
+Page Write command attempts to write
+across a physical page boundary, the
+result is that the data wraps around to the
+beginning of the current page (overwriting
+data previously stored there), instead of
+being written to the next page as might be
+expected.
+*********************************************************************/
+
+#include "ch.hpp"
+
 #include "eeprom_mtd.hpp"
+
+//using namespace chibios_rt;
 
 /*
  ******************************************************************************
  * DEFINES
  ******************************************************************************
  */
-#if defined(SAM7_PLATFORM)
-#define EEPROM_I2C_CLOCK (MCK / (((i2cp->config->cwgr & 0xFF) + ((i2cp->config->cwgr >> 8) & 0xFF)) * (1 << ((i2cp->config->cwgr >> 16) & 7)) + 6))
-#else
-#define EEPROM_I2C_CLOCK (i2cp->config->clock_speed)
-#endif
 
 /*
  ******************************************************************************
@@ -50,110 +71,28 @@
  ******************************************************************************
  */
 /**
- * @brief   Split one uint16_t address to two uint8_t.
- *
- * @param[in] txbuf pointer to driver transmit buffer
- * @param[in] addr  internal EEPROM device address
+ * @brief   Write data that can be fitted in single page boundary
  */
-static void eeprom_split_addr(uint8_t *txbuf, size_t addr){
-  txbuf[0] = (addr >> 8) & 0xFF;
-  txbuf[1] = addr & 0xFF;
-}
-
-/**
- * @brief     Calculates requred timeout.
- */
-static systime_t calc_timeout(I2CDriver *i2cp, size_t txbytes, size_t rxbytes){
-  const uint32_t bitsinbyte = 10;
-  uint32_t tmo;
-  tmo = ((txbytes + rxbytes + 1) * bitsinbyte * 1000);
-  tmo /= EEPROM_I2C_CLOCK;
-  tmo += 10; /* some additional milliseconds to be safer */
-  return MS2ST(tmo);
-}
-
-/*
- ******************************************************************************
- * EXPORTED FUNCTIONS
- ******************************************************************************
- */
-
-/**
- * @brief   Constructor
- */
-EepromMtd::EepromMtd(const EepromMtdConfig *cfg)
-#if (EEPROM_MTD_USE_MUTUAL_EXCLUSION && !CH_USE_MUTEXES)
-  : semaphore(1);
-#endif
-{
-  this->cfg = cfg;
-}
-
-/**
- * @brief   EEPROM read routine.
- *
- * @param[in] data        pointer to buffer where red data to be stored
- * @param[in] absoffset   address of first byte relatively to eeprom start
- * @param[in] len         number of bytes to be red
- */
-msg_t EepromMtd::read(uint8_t *data, size_t absoffset, size_t len){
-  msg_t status = RDY_RESET;
-  systime_t tmo = calc_timeout(cfg->i2cp, 2, len);
-  volatile i2cflags_t flags;
-
-  chDbgCheck((absoffset + len) <= (cfg->pages * cfg->pagesize),
-             "Transaction out of device bounds");
-
-  this->acquire();
-
-  eeprom_split_addr(writebuf, absoffset);
-
-  #if I2C_USE_MUTUAL_EXCLUSION
-    i2cAcquireBus(cfg->i2cp);
-  #endif
-
-  status = i2cMasterTransmitTimeout(cfg->i2cp, cfg->addr, writebuf,
-                                    2, data, len, tmo);
-  if (RDY_OK != status)
-    flags = i2cGetErrors(cfg->i2cp);
-
-  #if I2C_USE_MUTUAL_EXCLUSION
-    i2cReleaseBus(cfg->i2cp);
-  #endif
-
-  this->release();
-
-  (void)flags;
-  return status;
-}
-
-/**
- * @brief   EEPROM write routine.
- * @details Function writes data to EEPROM.
- * @pre     Data must be fit to single EEPROM page.
- *
- * @param[in] data        pointer to buffer containing data to be written
- * @param[in] absoffset   address of first byte relatively to eeprom start
- * @param[in] len         number of bytes to be written
- */
-msg_t EepromMtd::write(const uint8_t *data, size_t absoffset, size_t len){
+void EepromMtd::fitted_write(const uint8_t *data, size_t absoffset,
+                                        size_t len, uint32_t *written){
+  msg_t status = MSG_RESET;
+  systime_t tmo = calc_timeout(len + 2, 0);
 
   eeprom_led_on();
 
-  msg_t status = RDY_RESET;
-  systime_t tmo = calc_timeout(cfg->i2cp, (len + 2), 0);
-
-  chDbgCheck((absoffset + len) <= (cfg->pages * cfg->pagesize),
+  osalDbgAssert(len != 0, "something broken in higher level");
+  osalDbgAssert((absoffset + len) <= (eeprom_cfg->pages * eeprom_cfg->pagesize),
              "Transaction out of device bounds");
-
-  chDbgCheck(((absoffset / cfg->pagesize) ==
-             ((absoffset + len - 1) / cfg->pagesize)),
+  osalDbgAssert(((absoffset / eeprom_cfg->pagesize) ==
+             ((absoffset + len - 1) / eeprom_cfg->pagesize)),
              "Data can not be fitted in single page");
 
   this->acquire();
 
+  osalSysHalt("splitting of data in smaller buffer unrealized");
+
   /* write address bytes */
-  eeprom_split_addr(writebuf, absoffset);
+  split_addr(writebuf, absoffset);
   /* write data bytes */
   memcpy(&(writebuf[2]), data, len);
 
@@ -169,64 +108,136 @@ msg_t EepromMtd::write(const uint8_t *data, size_t absoffset, size_t len){
   #endif
 
   /* wait until EEPROM process data */
-  chThdSleep(cfg->writetime);
+  chThdSleep(eeprom_cfg->writetime);
+  this->release();
   eeprom_led_off();
 
-  this->release();
+  if (status == MSG_OK){
+    osalSysHalt("splitting of data in smaller buffer unrealized");
+    *written += len;
+  }
+}
 
+/*
+ ******************************************************************************
+ * EXPORTED FUNCTIONS
+ ******************************************************************************
+ */
+
+/**
+ *
+ */
+EepromMtd::EepromMtd(const MtdConfig *mtd_cfg, const EepromConfig *eeprom_cfg) :
+Mtd(mtd_cfg),
+eeprom_cfg(eeprom_cfg)
+{
+  return;
+}
+
+/**
+ *
+ */
+msg_t EepromMtd::read(uint8_t *data, size_t absoffset, size_t len){
+
+  msg_t status = MSG_RESET;
+  systime_t tmo = calc_timeout(2, len);
+
+  osalDbgAssert((absoffset + len) <= (eeprom_cfg->pages * eeprom_cfg->pagesize),
+             "Transaction out of device bounds");
+
+  this->acquire();
+
+  split_addr(writebuf, absoffset);
+
+  #if I2C_USE_MUTUAL_EXCLUSION
+    i2cAcquireBus(cfg->i2cp);
+  #endif
+
+  status = i2cMasterTransmitTimeout(cfg->i2cp, cfg->addr, writebuf,
+                                    2, data, len, tmo);
+  if (MSG_OK != status)
+    i2cflags = i2cGetErrors(cfg->i2cp);
+
+  #if I2C_USE_MUTUAL_EXCLUSION
+    i2cReleaseBus(cfg->i2cp);
+  #endif
+
+  this->release();
   return status;
+}
+
+/**
+ *
+ */
+msg_t EepromMtd::write(const uint8_t *bp, size_t absoffset, size_t n){
+
+  /* bytes to be written at one transaction */
+  size_t len;
+  /* total bytes successfully written */
+  uint32_t written;
+  /* cached value */
+  uint16_t pagesize = this->getPageSize();
+  /* first page to be affected during transaction */
+  uint32_t firstpage = absoffset / pagesize;
+  /* last page to be affected during transaction */
+  uint32_t lastpage = (absoffset + n - 1) / pagesize;
+
+  len = 0;
+  written = 0;
+
+  /* data can be fitted in single page */
+  if (firstpage == lastpage){
+    len = n;
+    fitted_write(bp, absoffset, len, &written);
+    bp += len;
+    absoffset += len;
+    return written;
+  }
+  else{
+    /* write first piece of data to the first page boundary */
+    len = firstpage * pagesize - absoffset;
+    fitted_write(bp, absoffset, len, &written);
+    bp += len;
+    absoffset += len;
+
+    /* now writes blocks at a size of pages (may be no one) */
+    len = pagesize;
+    while ((n - written) > pagesize){
+      fitted_write(bp, absoffset, len, &written);
+      bp += len;
+      absoffset += len;
+    }
+
+    /* write tail */
+    len = n - written;
+    if (0 == len)
+      return written;
+    else{
+      fitted_write(bp, absoffset, len, &written);
+    }
+  }
+
+  return written;
+}
+
+/**
+ *
+ */
+msg_t EepromMtd::shred(uint8_t pattern){
+  (void)pattern;
+  osalSysHalt("unrealized");
+  return MSG_RESET;
 }
 
 /**
  *
  */
 size_t EepromMtd::getPageSize(void){
-  return this->cfg->pagesize;
-}
-
-/**
- *
- */
-msg_t EepromMtd::massErase(void){
-  msg_t status = RDY_RESET;
-  size_t absoffset = 0;
-  uint8_t erasebuf[EEPROM_PAGE_SIZE];
-
-  memset(erasebuf, 0xFF, sizeof(erasebuf));
-  while (absoffset < EEPROM_PAGES * EEPROM_PAGE_SIZE){
-    status = write(erasebuf, absoffset, sizeof(erasebuf));
-    if (RDY_OK != status)
-      return status;
-    else
-      absoffset += sizeof(erasebuf);
-  }
-
-  return status;
+  return eeprom_cfg->pagesize;
 }
 
 
-/**
- *
- */
-void EepromMtd::acquire(void) {
-#if EEPROM_MTD_USE_MUTUAL_EXCLUSION
-#if CH_USE_MUTEXES
-  mutex.lock();
-#elif CH_USE_SEMAPHORES
-  semaphore.wait();
-#endif
-#endif /* EEPROM_MTD_USE_MUTUAL_EXCLUSION */
-}
 
-/**
- *
- */
-void EepromMtd::release(void) {
-#if EEPROM_MTD_USE_MUTUAL_EXCLUSION
-#if CH_USE_MUTEXES
-  chMtxUnlock();
-#elif CH_USE_SEMAPHORES
-  semaphore.signal();
-#endif
-#endif /* EEPROM_MTD_USE_MUTUAL_EXCLUSION */
-}
+
+
+
