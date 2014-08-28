@@ -33,11 +33,11 @@ being written to the next page as might be
 expected.
 *********************************************************************/
 
+#include <string.h>
+
 #include "ch.hpp"
 
 #include "eeprom_mtd.hpp"
-
-//using namespace chibios_rt;
 
 /*
  ******************************************************************************
@@ -73,39 +73,24 @@ expected.
 /**
  * @brief   Write data that can be fitted in single page boundary
  */
-void EepromMtd::fitted_write(const uint8_t *data, size_t absoffset,
-                                        size_t len, uint32_t *written){
+void EepromMtd::fitted_write(const uint8_t *data, size_t len,
+                            size_t offset, uint32_t *written){
   msg_t status = MSG_RESET;
-  systime_t tmo = calc_timeout(len + 2, 0);
 
   eeprom_led_on();
 
   osalDbgAssert(len != 0, "something broken in higher level");
-  osalDbgAssert((absoffset + len) <= (eeprom_cfg->pages * eeprom_cfg->pagesize),
+  osalDbgAssert((offset + len) <= (eeprom_cfg->pages * eeprom_cfg->pagesize),
              "Transaction out of device bounds");
-  osalDbgAssert(((absoffset / eeprom_cfg->pagesize) ==
-             ((absoffset + len - 1) / eeprom_cfg->pagesize)),
+  osalDbgAssert(((offset / eeprom_cfg->pagesize) ==
+             ((offset + len - 1) / eeprom_cfg->pagesize)),
              "Data can not be fitted in single page");
 
   this->acquire();
 
-  osalSysHalt("splitting of data in smaller buffer unrealized");
-
-  /* write address bytes */
-  split_addr(writebuf, absoffset);
-  /* write data bytes */
-  memcpy(&(writebuf[2]), data, len);
-
-  #if I2C_USE_MUTUAL_EXCLUSION
-    i2cAcquireBus(cfg->i2cp);
-  #endif
-
-  status = i2cMasterTransmitTimeout(cfg->i2cp, cfg->addr, writebuf,
-                                    (len + 2), NULL, 0, tmo);
-
-  #if I2C_USE_MUTUAL_EXCLUSION
-    i2cReleaseBus(cfg->i2cp);
-  #endif
+  split_addr(writebuf, offset);          /* write address bytes */
+  memcpy(&(writebuf[2]), data, len);        /* write data bytes */
+  status = busTransmit(writebuf, len+2);
 
   /* wait until EEPROM process data */
   chThdSleep(eeprom_cfg->writetime);
@@ -113,7 +98,6 @@ void EepromMtd::fitted_write(const uint8_t *data, size_t absoffset,
   eeprom_led_off();
 
   if (status == MSG_OK){
-    osalSysHalt("splitting of data in smaller buffer unrealized");
     *written += len;
   }
 }
@@ -131,112 +115,94 @@ EepromMtd::EepromMtd(const MtdConfig *mtd_cfg, const EepromConfig *eeprom_cfg) :
 Mtd(mtd_cfg),
 eeprom_cfg(eeprom_cfg)
 {
-  return;
+  osalDbgAssert(sizeof(writebuf) == eeprom_cfg->pagesize + 2,
+          "Buffer size must be equal pagesize + 2 bytes for address");
 }
 
 /**
  *
  */
-msg_t EepromMtd::read(uint8_t *data, size_t absoffset, size_t len){
-
-  msg_t status = MSG_RESET;
-  systime_t tmo = calc_timeout(2, len);
-
-  osalDbgAssert((absoffset + len) <= (eeprom_cfg->pages * eeprom_cfg->pagesize),
-             "Transaction out of device bounds");
-
-  this->acquire();
-
-  split_addr(writebuf, absoffset);
-
-  #if I2C_USE_MUTUAL_EXCLUSION
-    i2cAcquireBus(cfg->i2cp);
-  #endif
-
-  status = i2cMasterTransmitTimeout(cfg->i2cp, cfg->addr, writebuf,
-                                    2, data, len, tmo);
-  if (MSG_OK != status)
-    i2cflags = i2cGetErrors(cfg->i2cp);
-
-  #if I2C_USE_MUTUAL_EXCLUSION
-    i2cReleaseBus(cfg->i2cp);
-  #endif
-
-  this->release();
-  return status;
-}
-
-/**
- *
- */
-msg_t EepromMtd::write(const uint8_t *bp, size_t absoffset, size_t n){
+msg_t EepromMtd::write(const uint8_t *bp, size_t n, size_t offset){
 
   /* bytes to be written at one transaction */
-  size_t len;
+  size_t len = 0;
   /* total bytes successfully written */
-  uint32_t written;
+  uint32_t written = 0;
   /* cached value */
-  uint16_t pagesize = this->getPageSize();
+  uint16_t pagesize = eeprom_cfg->pagesize;
   /* first page to be affected during transaction */
-  uint32_t firstpage = absoffset / pagesize;
+  uint32_t firstpage = offset / pagesize;
   /* last page to be affected during transaction */
-  uint32_t lastpage = (absoffset + n - 1) / pagesize;
+  uint32_t lastpage = (offset + n - 1) / pagesize;
 
-  len = 0;
-  written = 0;
-
-  /* data can be fitted in single page */
+  /* data fits in single page */
   if (firstpage == lastpage){
     len = n;
-    fitted_write(bp, absoffset, len, &written);
+    fitted_write(bp, len, offset, &written);
     bp += len;
-    absoffset += len;
-    return written;
+    offset += len;
+    goto EXIT;
   }
   else{
     /* write first piece of data to the first page boundary */
-    len = firstpage * pagesize - absoffset;
-    fitted_write(bp, absoffset, len, &written);
+    len = firstpage * pagesize + pagesize - offset;
+    fitted_write(bp, len, offset, &written);
     bp += len;
-    absoffset += len;
+    offset += len;
 
     /* now writes blocks at a size of pages (may be no one) */
     len = pagesize;
     while ((n - written) > pagesize){
-      fitted_write(bp, absoffset, len, &written);
+      fitted_write(bp, len, offset, &written);
       bp += len;
-      absoffset += len;
+      offset += len;
     }
 
     /* write tail */
     len = n - written;
     if (0 == len)
-      return written;
+      goto EXIT;
     else{
-      fitted_write(bp, absoffset, len, &written);
+      fitted_write(bp, len, offset, &written);
     }
   }
 
-  return written;
+EXIT:
+  if (written == n)
+    return MSG_OK;
+  else
+    return MSG_RESET;
 }
 
 /**
  *
  */
 msg_t EepromMtd::shred(uint8_t pattern){
-  (void)pattern;
-  osalSysHalt("unrealized");
-  return MSG_RESET;
+
+  msg_t status = MSG_RESET;
+
+  eeprom_led_on();
+  this->acquire();
+
+  for (size_t i=0; i<eeprom_cfg->pages; i++){
+    memset(writebuf, pattern, sizeof(writebuf));
+    split_addr(writebuf, i * eeprom_cfg->pagesize);
+    status = busTransmit(writebuf, sizeof(writebuf));
+    osalDbgCheck(MSG_OK == status);
+    chThdSleep(eeprom_cfg->writetime);
+  }
+
+  this->release();
+  eeprom_led_off();
+  return MSG_OK;
 }
 
 /**
- *
+ * @brief   Return device capacity in bytes
  */
-size_t EepromMtd::getPageSize(void){
-  return eeprom_cfg->pagesize;
+size_t EepromMtd::capacity(void){
+  return eeprom_cfg->pagesize * eeprom_cfg->pages;
 }
-
-
 
 
 

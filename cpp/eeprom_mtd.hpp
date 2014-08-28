@@ -42,13 +42,12 @@ typedef struct {
 class EepromMtd : public Mtd {
 public:
   EepromMtd(const MtdConfig *mtd_cfg, const EepromConfig *eeprom_cfg);
-  msg_t read(uint8_t *data, size_t absoffset, size_t len);
-  msg_t write(const uint8_t *data, size_t absoffset, size_t len);
+  msg_t write(const uint8_t *data, size_t len, size_t offset);
   msg_t shred(uint8_t pattern);
-  size_t getPageSize(void);
+  size_t capacity(void);
+
 private:
-  void fitted_write(const uint8_t *data, size_t absoffset,
-                                          size_t len, uint32_t *written);
+  void fitted_write(const uint8_t *data, size_t len, size_t offset, uint32_t *written);
   const EepromConfig *eeprom_cfg;
 };
 

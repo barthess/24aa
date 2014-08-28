@@ -14,80 +14,54 @@
 #define EEPROM_FS_HPP_
 
 #include "eeprom_mtd.hpp"
+#include "eeprom_file.hpp"
 
-#define EEPROM_FS_MAX_FILES     4
-
-/**
- *
- */
-typedef struct inode_t {
-  /**
-   * first byte of file relative to memory start
-   */
-  uint16_t offset;
-  /**
-   * file size in bytes
-   */
-  uint16_t size;
-}inode_t;
+#define MAX_FILE_NAME_LEN     8
+#define MAX_FILE_CNT          3
 
 /**
  *
  */
-typedef struct toc_item_t {
+typedef struct {
   /**
    * NULL terminated string representing human readable name.
    */
-  char name[8];
+  uint8_t name[MAX_FILE_NAME_LEN];
   /**
-   * Number of file
+   * Start of file
    */
-  inode_t inode;
-}toc_item_t;
-
-/**
- * type representing index in inode table
- */
-typedef int32_t inodeid_t;
+  uint16_t start;
+  /**
+   * Size of file
+   */
+  uint16_t size;
+} toc_item_t;
 
 /**
  *
  */
 class EepromFs {
 public:
-  /*
-   * Constructor
-   */
   EepromFs(Mtd &mtd);
-  /*
-   * Designed to be called from higher level
-   */
-  size_t _write(const uint8_t *bp, size_t n, inodeid_t inodeid, fileoffset_t tip);
-  /*
-   * Designed to be called from higher level
-   */
-  size_t _read(uint8_t *buf, size_t n, inodeid_t inode, fileoffset_t tip);
-  /*
-   *
-   */
-  void mount(void);
+  EepromFile *open(const uint8_t *name);
+  EepromFile *create(const uint8_t *name, chibios_fs::fileoffset_t size);
+  void close(EepromFile *f);
+  bool mount(void);
+  void umount(void);
+  bool mkfs(void);
+  bool fsck(void);
+  chibios_fs::fileoffset_t df(void);
 private:
-  /*
-   *
-   */
-  void fsck();
-  /*
-   *
-   */
-  void mkfs();
-  /*
-   *
-   */
+  void open_super(void);
+  void get_magic(uint8_t *result);
+  void get_toc_item(toc_item_t *result, size_t num);
+  void write_toc_item(const toc_item_t *result, size_t num);
+  int find(const uint8_t *name, toc_item_t *ti);
+  uint8_t get_checksum(void);
+  uint8_t get_file_cnt(void);
   Mtd &mtd;
-  /*
-   *
-   */
-  toc_item_t file_table[EEPROM_FS_MAX_FILES];
+  EepromFile super;
+  EepromFile fat[MAX_FILE_CNT];
   /* counter of opened files. In unmounted state this value must be 0.
    * After mounting it must be set to 1 denoting successful mount. Every
    * 'open' operation must increment it and every 'close' must decrement it. */

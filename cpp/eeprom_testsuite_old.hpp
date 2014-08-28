@@ -10,9 +10,9 @@
         http://directory.fsf.org/wiki/License:BSD_3Clause
 */
 
-#ifndef FRAM_MTD_HPP_
-#define FRAM_MTD_HPP_
+#ifndef EEPROM_TESTSUITE_HPP_
+#define EEPROM_TESTSUITE_HPP_
 
-#include "mtd.hpp"
+void EepromTestSuite(void);
 
-#endif /* FRAM_MTD_HPP_ */
+#endif /* EEPROM_TESTSUITE_HPP_ */

@@ -13,6 +13,7 @@
 #ifndef MTD_HPP_
 #define MTD_HPP_
 
+#include "ch.hpp"
 #include "hal.h"
 
 #include "mtd_conf.h"
@@ -37,26 +38,30 @@ typedef struct {
 class Mtd {
 public:
   Mtd(const MtdConfig *cfg);
-  virtual msg_t read(uint8_t *data, size_t absoffset, size_t len) = 0;
-  virtual msg_t write(const uint8_t *data, size_t absoffset, size_t len) = 0;
+  msg_t read(uint8_t *data, size_t len, size_t offset);
+  virtual msg_t write(const uint8_t *data, size_t len, size_t offset) = 0;
   virtual msg_t shred(uint8_t pattern) = 0;
-private:
-  void acquire(void);
-  void release(void);
+  virtual size_t capacity(void) = 0;
+
+protected:
+  msg_t busTransmit(const uint8_t *txbuf, size_t txbytes);
+  msg_t busReceive(uint8_t *rxbuf, size_t rxbytes);
+  msg_t stm32_f1x_read_byte(uint8_t *data, size_t offset);
   void split_addr(uint8_t *txbuf, size_t addr);
   systime_t calc_timeout(size_t txbytes, size_t rxbytes);
-
-  const MtdConfig *cfg;
+  void acquire(void);
+  void release(void);
   uint8_t writebuf[MTD_WRITE_BUF_SIZE];
+  const MtdConfig *cfg;
   i2cflags_t i2cflags;
 
-  #if EEPROM_MTD_USE_MUTUAL_EXCLUSION
+  #if MTD_USE_MUTUAL_EXCLUSION
     #if CH_CFG_USE_MUTEXES
       chibios_rt::Mutex             mutex;
     #elif CH_CFG_USE_SEMAPHORES
       chibios_rt::CounterSemaphore  semaphore;
     #endif
-  #endif /* EEPROM_MTD_USE_MUTUAL_EXCLUSION */
+  #endif /* MTD_USE_MUTUAL_EXCLUSION */
 };
 
 #endif /* MTD_HPP_ */

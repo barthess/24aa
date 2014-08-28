@@ -14,7 +14,6 @@
 
 #include "mtd.hpp"
 
-//using namespace chibios_rt;
 /*
  ******************************************************************************
  * DEFINES
@@ -86,7 +85,7 @@ systime_t Mtd::calc_timeout(size_t txbytes, size_t rxbytes){
 Mtd::Mtd(const MtdConfig *cfg) :
 cfg(cfg),
 i2cflags(I2C_NO_ERROR)
-#if (EEPROM_MTD_USE_MUTUAL_EXCLUSION && !CH_CFG_USE_MUTEXES)
+#if (MTD_USE_MUTUAL_EXCLUSION && !CH_CFG_USE_MUTEXES)
   ,semaphore(1)
 #endif
 {
@@ -97,27 +96,122 @@ i2cflags(I2C_NO_ERROR)
  *
  */
 void Mtd::acquire(void) {
-#if EEPROM_MTD_USE_MUTUAL_EXCLUSION
+#if MTD_USE_MUTUAL_EXCLUSION
   #if CH_CFG_USE_MUTEXES
     mutex.lock();
   #elif CH_CFG_USE_SEMAPHORES
     semaphore.wait();
   #endif
-#endif /* EEPROM_MTD_USE_MUTUAL_EXCLUSION */
+#endif /* MTD_USE_MUTUAL_EXCLUSION */
 }
 
 /**
  *
  */
 void Mtd::release(void) {
-#if EEPROM_MTD_USE_MUTUAL_EXCLUSION
+#if MTD_USE_MUTUAL_EXCLUSION
   #if CH_CFG_USE_MUTEXES
     mutex.unlock();
   #elif CH_CFG_USE_SEMAPHORES
     semaphore.signal();
   #endif
-#endif /* EEPROM_MTD_USE_MUTUAL_EXCLUSION */
+#endif /* MTD_USE_MUTUAL_EXCLUSION */
 }
+
+/**
+ *
+ */
+msg_t Mtd::read(uint8_t *data, size_t len, size_t offset){
+
+  msg_t status = MSG_RESET;
+
+#if defined(STM32F1XX_I2C)
+  if (1 == len)
+    return stm32_f1x_read_byte(data, offset);
+#endif /* defined(STM32F1XX_I2C) */
+
+  osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
+
+  this->acquire();
+  split_addr(writebuf, offset);
+  status = busReceive(data, len);
+  if (MSG_OK != status)
+    i2cflags = i2cGetErrors(cfg->i2cp);
+  this->release();
+
+  return status;
+}
+
+/**
+ *
+ */
+msg_t Mtd::busReceive(uint8_t *data, size_t len){
+
+  msg_t status = MSG_RESET;
+  systime_t tmo = calc_timeout(2, len);
+
+#if I2C_USE_MUTUAL_EXCLUSION
+  i2cAcquireBus(cfg->i2cp);
+#endif
+
+  status = i2cMasterTransmitTimeout(cfg->i2cp, cfg->addr, writebuf, 2, data, len, tmo);
+  if (MSG_OK != status)
+    i2cflags = i2cGetErrors(cfg->i2cp);
+
+#if I2C_USE_MUTUAL_EXCLUSION
+  i2cReleaseBus(cfg->i2cp);
+#endif
+
+  return status;
+}
+
+/**
+ *
+ */
+msg_t Mtd::busTransmit(const uint8_t *data, size_t len){
+
+  msg_t status = MSG_RESET;
+  systime_t tmo = calc_timeout(len + 2, 0);
+
+#if I2C_USE_MUTUAL_EXCLUSION
+  i2cAcquireBus(cfg->i2cp);
+#endif
+
+  status = i2cMasterTransmitTimeout(cfg->i2cp, cfg->addr, data, len, NULL, 0, tmo);
+  if (MSG_OK != status)
+    i2cflags = i2cGetErrors(cfg->i2cp);
+
+#if I2C_USE_MUTUAL_EXCLUSION
+  i2cReleaseBus(cfg->i2cp);
+#endif
+
+  return status;
+}
+
+/*
+ * Ugly workaround.
+ * Stupid I2C cell in STM32F1x does not allow to read single byte.
+ * So we must read 2 bytes and return needed one.
+ */
+msg_t Mtd::stm32_f1x_read_byte(uint8_t *buf, size_t absoffset){
+  uint8_t tmp[2];
+  msg_t ret;
+
+  /* if NOT last byte of file requested */
+  if ((absoffset - 1) < capacity()){
+    ret = read(tmp, absoffset, 2);
+    buf[0] = tmp[0];
+  }
+  else{
+    ret = read(tmp, absoffset - 1, 2);
+    buf[0] = tmp[1];
+  }
+
+  return ret;
+}
+
+
+
 
 
 

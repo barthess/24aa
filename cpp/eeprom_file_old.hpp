@@ -14,39 +14,36 @@
 #define EEPROM_FILE_CPP_H_
 
 #include "fs.hpp"
-#include "mtd.hpp"
+#include "eeprom_fs.hpp"
 
 class EepromFile : public chibios_fs::BaseFileStreamInterface{
 public:
   EepromFile(void);
-//  EepromFile(Mtd *mtd, fileoffset_t start, fileoffset_t size);
   uint32_t getAndClearLastError(void);
-  chibios_fs::fileoffset_t getSize(void);
-  chibios_fs::fileoffset_t getPosition(void);
-  uint32_t setPosition(chibios_fs::fileoffset_t pos);
+  fileoffset_t getSize(void);
+  fileoffset_t getPosition(void);
+  uint32_t setPosition(fileoffset_t pos);
 
-  size_t write(const uint8_t *buf, size_t n);
-  size_t read(uint8_t *buf, size_t n);
+  size_t write(const uint8_t *bp, size_t n);
+  size_t read(uint8_t *bp, size_t n);
   msg_t put(uint8_t b);
   msg_t get(void);
 
-  uint64_t getU64(void);
-  uint32_t getU32(void);
-  uint16_t getU16(void);
-  size_t putU64(uint64_t data);
-  size_t putU32(uint32_t data);
-  size_t putU16(uint16_t data);
-
+  uint32_t readWord(void);
+  uint16_t readHalfWord(void);
+  size_t writeWord(uint32_t data);
+  size_t writeHalfWord(uint16_t data);
+  bool open(EepromFs *fs, uint8_t *name);
   void close(void);
 
 private:
   size_t clamp_size(size_t n);
-
-public:
-  Mtd *mtd;
-  uint16_t start; /* file start in bytes relative to device start */
-  uint16_t size;  /* size (bytes) */
-  uint16_t tip;   /* current position in file (bytes) */
+  EepromFs *fs;
+  /**
+   * Current position in bytes relative to file start
+   */
+  fileoffset_t tip;
+  inodeid_t inodeid;
 };
 
 #endif /* EEPROM_FILE_CPP_H_ */
