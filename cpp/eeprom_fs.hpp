@@ -45,17 +45,20 @@ public:
   EepromFs(Mtd &mtd);
   EepromFile *open(const uint8_t *name);
   EepromFile *create(const uint8_t *name, chibios_fs::fileoffset_t size);
-  void close(EepromFile *f);
   bool mount(void);
   void umount(void);
   bool mkfs(void);
   bool fsck(void);
   chibios_fs::fileoffset_t df(void);
+  bool rm(const uint8_t *name);
 private:
   void open_super(void);
+  void seal(void);
   void get_magic(uint8_t *result);
   void get_toc_item(toc_item_t *result, size_t num);
   void write_toc_item(const toc_item_t *result, size_t num);
+  void ulink(int id);
+  void gc(void);
   int find(const uint8_t *name, toc_item_t *ti);
   uint8_t get_checksum(void);
   uint8_t get_file_cnt(void);

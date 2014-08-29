@@ -34,6 +34,7 @@ expected.
 *********************************************************************/
 
 #include <string.h>
+#include <stdlib.h>
 
 #include "ch.hpp"
 
@@ -184,8 +185,8 @@ msg_t EepromMtd::shred(uint8_t pattern){
   eeprom_led_on();
   this->acquire();
 
+  memset(writebuf, pattern, sizeof(writebuf));
   for (size_t i=0; i<eeprom_cfg->pages; i++){
-    memset(writebuf, pattern, sizeof(writebuf));
     split_addr(writebuf, i * eeprom_cfg->pagesize);
     status = busTransmit(writebuf, sizeof(writebuf));
     osalDbgCheck(MSG_OK == status);
@@ -203,6 +204,34 @@ msg_t EepromMtd::shred(uint8_t pattern){
 size_t EepromMtd::capacity(void){
   return eeprom_cfg->pagesize * eeprom_cfg->pages;
 }
+
+/**
+ *
+ */
+size_t EepromMtd::page_size(void){
+  return eeprom_cfg->pagesize;
+}
+
+/**
+ * @brief   Move big block of data.
+ */
+msg_t EepromMtd::move(size_t blklen, size_t blkoffset, int32_t shift){
+  msg_t status = MSG_RESET;
+
+  osalSysHalt("Unfinished function");
+
+  osalDbgCheck((blklen > 0) && ((blkoffset + blklen) < capacity()));
+  osalDbgAssert((shift < 0) && ((blkoffset + shift) <= 0), "Underflow");
+  osalDbgAssert((shift > 0) && ((shift + blkoffset) < capacity()), "Overflow");
+
+  if (0 == shift)
+    return MSG_OK; /* nothing to do */
+
+  return status;
+}
+
+
+
 
 
 

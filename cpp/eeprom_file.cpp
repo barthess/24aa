@@ -88,6 +88,16 @@ EepromFile::EepromFile(void) {
 /**
  *
  */
+void EepromFile::__test_ctor(Mtd *mtd, fileoffset_t start, fileoffset_t size){
+  this->mtd = mtd;
+  this->tip = 0;
+  this->start = start;
+  this->size = size;
+}
+
+/**
+ *
+ */
 size_t EepromFile::clamp_size(size_t n){
   size_t p = getPosition();
   size_t s = getSize();
@@ -102,6 +112,9 @@ size_t EepromFile::clamp_size(size_t n){
  */
 void EepromFile::close(void){
   this->mtd = NULL;
+  this->tip = 0;
+  this->start = 0;
+  this->size = 0;
 }
 
 /**
@@ -180,7 +193,25 @@ size_t EepromFile::write(const uint8_t *buf, size_t n){
  */
 uint64_t EepromFile::getU64(void){
   uint64_t ret;
-  osalDbgCheck(sizeof(ret) == read((uint8_t *)&ret, sizeof(ret)));
+  read((uint8_t *)&ret, sizeof(ret));
+  return ret;
+}
+
+/**
+ *
+ */
+uint32_t EepromFile::getU32(void){
+  uint32_t ret;
+  read((uint8_t *)&ret, sizeof(ret));
+  return ret;
+}
+
+/**
+ *
+ */
+uint16_t EepromFile::getU16(void){
+  uint16_t ret;
+  read((uint8_t *)&ret, sizeof(ret));
   return ret;
 }
 
@@ -194,26 +225,8 @@ size_t EepromFile::putU64(uint64_t data){
 /**
  *
  */
-uint32_t EepromFile::getU32(void){
-  uint32_t ret;
-  osalDbgCheck(sizeof(ret) == read((uint8_t *)&ret, sizeof(ret)));
-  return ret;
-}
-
-/**
- *
- */
 size_t EepromFile::putU32(uint32_t data){
   return write((uint8_t *)&data, sizeof(data));
-}
-
-/**
- *
- */
-uint16_t EepromFile::getU16(void){
-  uint16_t ret;
-  osalDbgCheck(sizeof(ret) == read((uint8_t *)&ret, sizeof(ret)));
-  return ret;
 }
 
 /**

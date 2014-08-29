@@ -40,9 +40,10 @@ public:
   Mtd(const MtdConfig *cfg);
   msg_t read(uint8_t *data, size_t len, size_t offset);
   virtual msg_t write(const uint8_t *data, size_t len, size_t offset) = 0;
+  virtual msg_t move(size_t blklen, size_t blkoffset, int32_t shift) = 0;
   virtual msg_t shred(uint8_t pattern) = 0;
   virtual size_t capacity(void) = 0;
-
+  virtual size_t page_size(void) = 0;
 protected:
   msg_t busTransmit(const uint8_t *txbuf, size_t txbytes);
   msg_t busReceive(uint8_t *rxbuf, size_t rxbytes);

@@ -17,9 +17,10 @@
 #include "mtd.hpp"
 
 class EepromFile : public chibios_fs::BaseFileStreamInterface{
+  friend class EepromFs;
 public:
   EepromFile(void);
-//  EepromFile(Mtd *mtd, fileoffset_t start, fileoffset_t size);
+  void __test_ctor(Mtd *mtd, chibios_fs::fileoffset_t start, chibios_fs::fileoffset_t size);
   uint32_t getAndClearLastError(void);
   chibios_fs::fileoffset_t getSize(void);
   chibios_fs::fileoffset_t getPosition(void);
@@ -41,8 +42,6 @@ public:
 
 private:
   size_t clamp_size(size_t n);
-
-public:
   Mtd *mtd;
   uint16_t start; /* file start in bytes relative to device start */
   uint16_t size;  /* size (bytes) */

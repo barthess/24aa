@@ -211,10 +211,7 @@ static void get_size_check(EepromMtd &mtd){
 
 static void file_test(void){
   EepromFile eef;
-  eef.mtd = &eemtd;
-  eef.tip = 0;
-  eef.start = EEPROM_PAGE_SIZE * 2;
-  eef.size = EEPROM_PAGE_SIZE;
+  eef.__test_ctor(&eemtd, EEPROM_PAGE_SIZE * 2, EEPROM_PAGE_SIZE);
 
   uint16_t u16 = 0x0102;
   uint32_t u32 = 0x03040506;
