@@ -160,7 +160,7 @@ size_t EepromFile::read(uint8_t *buf, size_t n){
   if (0 == n)
     return 0;
 
-  if (MSG_OK == mtd->read(buf, n, tip)){
+  if (MSG_OK == mtd->read(buf, n, tip + start)){
     tip += n;
     return n;
   }
@@ -180,7 +180,7 @@ size_t EepromFile::write(const uint8_t *buf, size_t n){
   if (0 == n)
     return 0;
 
-  if (MSG_OK == mtd->write(buf, n, tip)){
+  if (MSG_OK == mtd->write(buf, n, tip + start)){
     tip += n;
     return n;
   }

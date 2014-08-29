@@ -38,10 +38,9 @@ public:
   size_t putU32(uint32_t data);
   size_t putU16(uint16_t data);
 
-  void close(void);
-
 private:
   size_t clamp_size(size_t n);
+  void close(void);
   Mtd *mtd;
   uint16_t start; /* file start in bytes relative to device start */
   uint16_t size;  /* size (bytes) */

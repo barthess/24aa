@@ -209,35 +209,43 @@ static void get_size_check(EepromMtd &mtd){
   osalDbgCheck((EEPROM_PAGE_COUNT * EEPROM_PAGE_SIZE) == mtd.capacity());
 }
 
-static void file_test(void){
-  EepromFile eef;
-  eef.__test_ctor(&eemtd, EEPROM_PAGE_SIZE * 2, EEPROM_PAGE_SIZE);
+static void file_test(EepromFile *eef){
 
   uint16_t u16 = 0x0102;
   uint32_t u32 = 0x03040506;
   uint64_t u64 = 0x0708090A0B0C0D0E;
+  osalDbgCheck(NULL != eef);
 
-  eef.setPosition(0);
-  osalDbgCheck(2 == eef.putU16(u16));
-  osalDbgCheck(4 == eef.putU32(u32));
-  osalDbgCheck(8 == eef.putU64(u64));
+  eef->setPosition(0);
+  osalDbgCheck(2 == eef->putU16(u16));
+  osalDbgCheck(4 == eef->putU32(u32));
+  osalDbgCheck(8 == eef->putU64(u64));
 
-  eef.setPosition(0);
-  osalDbgCheck(u16 == eef.getU16());
-  osalDbgCheck(u32 == eef.getU32());
-  osalDbgCheck(u64 == eef.getU64());
+  eef->setPosition(0);
+  osalDbgCheck(u16 == eef->getU16());
+  osalDbgCheck(u32 == eef->getU32());
+  osalDbgCheck(u64 == eef->getU64());
 
-  eef.setPosition(0);
-  osalDbgCheck(8 == eef.putU64(u64));
-  osalDbgCheck(4 == eef.putU32(u32));
-  osalDbgCheck(2 == eef.putU16(u16));
+  eef->setPosition(0);
+  osalDbgCheck(8 == eef->putU64(u64));
+  osalDbgCheck(4 == eef->putU32(u32));
+  osalDbgCheck(2 == eef->putU16(u16));
 
-  eef.setPosition(0);
-  osalDbgCheck(u64 == eef.getU64());
-  osalDbgCheck(u32 == eef.getU32());
-  osalDbgCheck(u16 == eef.getU16());
+  eef->setPosition(0);
+  osalDbgCheck(u64 == eef->getU64());
+  osalDbgCheck(u32 == eef->getU32());
+  osalDbgCheck(u16 == eef->getU16());
 }
 
+static void addres_translate_test(void){
+  memset(refbuf, 0x00, sizeof(refbuf));
+  memset(mtdbuf, , sizeof(mtdbuf));
+  memset(filebuf, pattern, len);
+
+  EepromFile eef;
+  eef.__test_ctor(&eemtd, EEPROM_PAGE_SIZE * 2, EEPROM_PAGE_SIZE);
+  file_test(&eef);
+}
 /*
  ******************************************************************************
  * EXPORTED FUNCTIONS
@@ -245,18 +253,67 @@ static void file_test(void){
  */
 
 void testEepromMtd(void){
+  size_t df, df2;
+  EepromFile *test0, *test1, *test2, *test3;
   get_size_check(eemtd);
 
-  file_test();
-
   write_align_check(eemtd);
+  write_misalign_check(eemtd);
+
+  {
+    EepromFile eef;
+    eef.__test_ctor(&eemtd, EEPROM_PAGE_SIZE * 2, EEPROM_PAGE_SIZE);
+    file_test(&eef);
+  }
+
+  eemtd.shred(0xFF);
   osalDbgCheck(OSAL_FAILED  == eefs.mount());
   osalDbgCheck(OSAL_FAILED  == eefs.fsck());
   osalDbgCheck(OSAL_SUCCESS == eefs.mkfs());
   osalDbgCheck(OSAL_SUCCESS == eefs.fsck());
   osalDbgCheck(OSAL_SUCCESS == eefs.mount());
 
-  write_misalign_check(eemtd);
+  df = eefs.df();
+  test0 = eefs.create("test0", 1024);
+  osalDbgCheck(NULL != test0);
+  df2 = eefs.df();
+  osalDbgCheck(df2 == (df - 1024));
+  memset(mtdbuf, 0x55, sizeof(mtdbuf));
+  osalDbgCheck(MSG_OK == eemtd.read(mtdbuf, sizeof(mtdbuf), 0));
+  file_test(test0);
+  memset(mtdbuf, 0x55, sizeof(mtdbuf));
+  osalDbgCheck(MSG_OK == eemtd.read(mtdbuf, sizeof(mtdbuf), 0));
+  eefs.close(test0);
+  test0 = eefs.open("test0");
+  osalDbgCheck(NULL != test0);
+  eefs.close(test0);
+  test0 = eefs.create("test0", 1024);
+  osalDbgCheck(NULL == test0);
+
+  test1 = eefs.create("test1", 32);
+  osalDbgCheck(NULL != test1);
+  df2 = eefs.df();
+  osalDbgCheck(df2 == (df - 1024 - 32));
+
+  test2 = eefs.create("test2", 32);
+  osalDbgCheck(NULL != test2);
+  df2 = eefs.df();
+  osalDbgCheck(df2 == (df - 1024 - 32 - 32));
+
+  test3 = eefs.create("test3", 32);
+  osalDbgCheck(NULL == test3);
+
+  file_test(test1);
+  file_test(test2);
+
+  eefs.close(test1);
+  eefs.close(test2);
+
+  osalDbgCheck(OSAL_SUCCESS == eefs.umount());
+  osalDbgCheck(OSAL_SUCCESS == eefs.fsck());
+
+  memset(mtdbuf, 0x55, sizeof(mtdbuf));
+  osalDbgCheck(MSG_OK == eemtd.read(mtdbuf, sizeof(mtdbuf), 0));
 }
 
 

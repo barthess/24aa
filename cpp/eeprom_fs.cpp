@@ -88,14 +88,16 @@ static uint8_t xorbuf(const uint8_t *buf, size_t len){
 /**
  *
  */
-static bool check_name(const uint8_t *buf, size_t len) {
+static bool check_name(const char *buf, size_t len) {
 
   int str_len = -1;
 
   /* check string length */
   for (size_t i=0; i<len; i++){
-    if (0 == buf[i])
+    if (0 == buf[i]){
       str_len = i;
+      break;
+    }
   }
   if (-1 == str_len)
     return OSAL_FAILED;
@@ -117,15 +119,13 @@ bool EepromFs::mkfs(void) {
   uint8_t buf[sizeof(toc_item_t)];
   uint8_t checksum = xorbuf(magic, sizeof(magic));
   size_t written;
-  checksum ^= MAX_FILE_CNT;
 
-  osalDbgAssert((0 == files_opened) && (NULL == super.mtd),
-                        "running mkfs on mounted FS forbidden");
+  osalDbgCheck((this->files_opened == 0) && (NULL == super.mtd));
   open_super();
   osalDbgAssert((super.start + super.size) < mtd.capacity(), "Overflow");
 
   memcpy(buf, magic, sizeof(magic));
-  buf[sizeof(magic)] = 0; /* exixting files count */
+  buf[sizeof(magic)] = 0; /* existing files count */
   if (FILE_OK != super.setPosition(0))
     goto FAILED;
   if (FAT_OFFSET != super.write(buf, FAT_OFFSET))
@@ -192,11 +192,12 @@ void EepromFs::seal(void){
   uint8_t checksum;
 
   /* open file */
-  osalDbgAssert((0 != files_opened) && (NULL != super.mtd), "FS must be mounted");
+  osalDbgCheck((this->files_opened > 0) && (NULL != super.mtd));
 
   checksum = xorbuf(magic, sizeof(magic));
   checksum ^= get_file_cnt();
 
+  super.setPosition(FAT_OFFSET);
   for (size_t i=0; i<MAX_FILE_CNT; i++){
     uint32_t status = super.read(buf, sizeof(buf));
     osalDbgCheck(sizeof(buf) == status);
@@ -227,6 +228,20 @@ uint8_t EepromFs::get_file_cnt(void){
 /**
  *
  */
+void EepromFs::write_file_cnt(uint8_t cnt){
+
+  uint32_t status;
+
+  status = super.setPosition(sizeof(magic));
+  osalDbgCheck(FILE_OK == status);
+
+  status = super.write(&cnt, 1);
+  osalDbgCheck(1 == status);
+}
+
+/**
+ *
+ */
 void EepromFs::get_toc_item(toc_item_t *result, size_t num){
   osalDbgCheck(num < MAX_FILE_CNT);
   uint32_t status;
@@ -242,16 +257,19 @@ void EepromFs::get_toc_item(toc_item_t *result, size_t num){
 /**
  *
  */
-void EepromFs::write_toc_item(const toc_item_t *result, size_t num){
-  osalDbgCheck(num < MAX_FILE_CNT);
+void EepromFs::write_toc_item(const toc_item_t *ti, uint8_t num){
+
   uint32_t status;
   const size_t blocklen = sizeof(toc_item_t);
 
+  osalDbgCheck(num < MAX_FILE_CNT);
+
   status = super.setPosition(FAT_OFFSET + num * blocklen);
   osalDbgCheck(FILE_OK == status);
-
-  status = super.write((uint8_t *)result, blocklen);
+  status = super.write((uint8_t *)ti, blocklen);
   osalDbgCheck(blocklen == status);
+
+  write_file_cnt(num + 1);
 }
 
 /**
@@ -265,8 +283,7 @@ bool EepromFs::fsck(void) {
   size_t exists;
 
   /* open file */
-  osalDbgAssert((0 == files_opened) && (NULL == super.mtd),
-                        "running fsck on mounted FS forbidden");
+  osalDbgCheck((this->files_opened == 0) && (NULL == super.mtd));
   open_super();
 
   /* check magic */
@@ -336,7 +353,8 @@ void EepromFs::gc(void){
  *
  */
 EepromFs::EepromFs(Mtd &mtd) :
-mtd(mtd)
+mtd(mtd),
+files_opened(0)
 {
   return;
 }
@@ -346,7 +364,9 @@ mtd(mtd)
  */
 bool EepromFs::mount(void) {
 
-  osalDbgAssert((0 == this->files_opened), "FS already mounted");
+  /* already mounted */
+  if (this->files_opened > 1)
+    return OSAL_SUCCESS;
 
   /* check file table correctness*/
   if (OSAL_FAILED == fsck())
@@ -365,22 +385,27 @@ FAILED:
 /**
  *
  */
-void EepromFs::umount(void) {
+bool EepromFs::umount(void) {
 
-  osalDbgAssert((this->files_opened == 1), "FS has some opened files");
-  super.close();
-  this->files_opened = 0;
+  /* FS has some opened files */
+  if (this->files_opened > 1)
+    return OSAL_FAILED;
+  else{
+    super.close();
+    this->files_opened = 0;
+    return OSAL_SUCCESS;
+  }
 }
 
 /**
  *
  */
-int EepromFs::find(const uint8_t *name, toc_item_t *ti){
+int EepromFs::find(const char *name, toc_item_t *ti){
   size_t i = 0;
 
   for (i=0; i<MAX_FILE_CNT; i++){
     get_toc_item(ti, i);
-    if (0 == strcmp((const char*)name, (const char*)ti->name)){
+    if (0 == strcmp(name, ti->name)){
       return i;
     }
   }
@@ -390,12 +415,12 @@ int EepromFs::find(const uint8_t *name, toc_item_t *ti){
 /**
  *
  */
-EepromFile * EepromFs::create(const uint8_t *name, chibios_fs::fileoffset_t size){
+EepromFile * EepromFs::create(const char *name, chibios_fs::fileoffset_t size){
   toc_item_t ti;
   int id = -1;
   size_t file_cnt;
 
-  osalDbgAssert((this->files_opened > 0), "FS not mounted");
+  osalDbgAssert(this->files_opened > 0, "FS not mounted");
 
   /* zero size forbidden */
   if (0 == size)
@@ -412,15 +437,20 @@ EepromFile * EepromFs::create(const uint8_t *name, chibios_fs::fileoffset_t size
     return NULL; /* such file already exists */
 
   /* check for name length */
-  if (strlen((char *)name) < MAX_FILE_NAME_LEN)
+  if (strlen(name) >= MAX_FILE_NAME_LEN)
     return NULL;
 
   /* there is no such file. Lets create it*/
-  strncpy((char *)ti.name, (const char *)name, MAX_FILE_NAME_LEN);
+  strncpy(ti.name, name, MAX_FILE_NAME_LEN);
   ti.size = size;
-  ti.start = super.size + super.start;
-  if (0 != file_cnt)
-    ti.start += fat[file_cnt].start + fat[file_cnt].size;
+  if (0 != file_cnt){
+    toc_item_t tiprev;
+    get_toc_item(&tiprev, file_cnt - 1);
+    ti.start = tiprev.start + tiprev.size;
+  }
+  else
+    ti.start = super.size + super.start;
+
   if ((ti.size + ti.start) > mtd.capacity())
     return NULL;
 
@@ -433,11 +463,11 @@ EepromFile * EepromFs::create(const uint8_t *name, chibios_fs::fileoffset_t size
 /**
  *
  */
-EepromFile *EepromFs::open(const uint8_t *name){
+EepromFile *EepromFs::open(const char *name){
   toc_item_t ti;
   int id = -1;
 
-  osalDbgAssert((this->files_opened > 0), "FS not mounted");
+  osalDbgAssert(this->files_opened > 0, "FS not mounted");
 
   id = find(name, &ti);
 
@@ -450,8 +480,19 @@ EepromFile *EepromFs::open(const uint8_t *name){
   fat[id].size = ti.size;
   fat[id].start = ti.start;
   fat[id].mtd = &mtd;
+  this->files_opened++;
 
   return &fat[id];
+}
+
+/**
+ *
+ */
+void EepromFs::close(EepromFile *f) {
+  osalDbgAssert(this->files_opened > 0, "FS not mounted");
+
+  f->close();
+  this->files_opened--;
 }
 
 /**
@@ -461,28 +502,27 @@ fileoffset_t EepromFs::df(void){
 
   toc_item_t ti;
   size_t file_cnt;
-  size_t free;
 
-  osalDbgAssert((this->files_opened > 0), "FS not mounted");
+  osalDbgAssert(this->files_opened > 0, "FS not mounted");
 
-  free = mtd.capacity() - (super.size + super.start);
   file_cnt = get_file_cnt();
   if (file_cnt > 0){
-    get_toc_item(&ti, file_cnt);
-    free -= ti.size + ti.start;
+    get_toc_item(&ti, file_cnt - 1);
+    return mtd.capacity() - (ti.size + ti.start);
   }
-
-  return free;
+  else{
+    return mtd.capacity() - (super.size + super.start);
+  }
 }
 
 /**
  *
  */
-bool EepromFs::rm(const uint8_t *name){
+bool EepromFs::rm(const char *name){
   toc_item_t ti;
   int id = -1;
 
-  osalDbgAssert((this->files_opened > 0), "FS not mounted");
+  osalDbgAssert(this->files_opened > 0, "FS not mounted");
 
   id = find(name, &ti);
 

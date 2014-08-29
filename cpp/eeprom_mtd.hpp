@@ -21,17 +21,17 @@
 typedef struct {
   /**
    * Time needed by IC for single page writing.
-   * Check datasheet!!!
+   * Consult datasheet!!!
    */
   systime_t     writetime;
   /**
    * Size of memory array in pages.
-   * Check datasheet!!!
+   * Consult datasheet!!!
    */
   size_t        pages;
   /**
    * Size of single page in bytes.
-   * Check datasheet!!!
+   * Consult datasheet!!!
    */
   size_t        pagesize;
 }EepromConfig;
