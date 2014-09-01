@@ -19,6 +19,11 @@ Note! You have to provide fucntions eeprom_led_on() and eeprom_led_off()
 in your mtd_conf.h If you do not need such functionality just 
 define empty macros. 
 
+4. LICENSE
+
+Code is published under the GPLv3 or later.
+Old code in 'legacy' direcory published under BSD-3 license.
+
 
 Author: Uladzimir Pylinski aka barthess (barthess@yandex.ru). 
 01.09.2014
