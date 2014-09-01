@@ -123,10 +123,10 @@ eeprom_cfg(eeprom_cfg)
 /**
  *
  */
-msg_t EepromMtd::write(const uint8_t *bp, size_t n, size_t offset){
+msg_t EepromMtd::write(const uint8_t *bp, size_t len, size_t offset){
 
   /* bytes to be written at one transaction */
-  size_t len = 0;
+  size_t L = 0;
   /* total bytes successfully written */
   uint32_t written = 0;
   /* cached value */
@@ -134,42 +134,42 @@ msg_t EepromMtd::write(const uint8_t *bp, size_t n, size_t offset){
   /* first page to be affected during transaction */
   uint32_t firstpage = offset / pagesize;
   /* last page to be affected during transaction */
-  uint32_t lastpage = (offset + n - 1) / pagesize;
+  uint32_t lastpage = (offset + len - 1) / pagesize;
 
   /* data fits in single page */
   if (firstpage == lastpage){
-    len = n;
-    fitted_write(bp, len, offset, &written);
-    bp += len;
-    offset += len;
+    L = len;
+    fitted_write(bp, L, offset, &written);
+    bp += L;
+    offset += L;
     goto EXIT;
   }
   else{
     /* write first piece of data to the first page boundary */
-    len = firstpage * pagesize + pagesize - offset;
-    fitted_write(bp, len, offset, &written);
-    bp += len;
-    offset += len;
+    L = firstpage * pagesize + pagesize - offset;
+    fitted_write(bp, L, offset, &written);
+    bp += L;
+    offset += L;
 
     /* now writes blocks at a size of pages (may be no one) */
-    len = pagesize;
-    while ((n - written) > pagesize){
-      fitted_write(bp, len, offset, &written);
-      bp += len;
-      offset += len;
+    L = pagesize;
+    while ((len - written) > pagesize){
+      fitted_write(bp, L, offset, &written);
+      bp += L;
+      offset += L;
     }
 
     /* write tail */
-    len = n - written;
-    if (0 == len)
+    L = len - written;
+    if (0 == L)
       goto EXIT;
     else{
-      fitted_write(bp, len, offset, &written);
+      fitted_write(bp, L, offset, &written);
     }
   }
 
 EXIT:
-  if (written == n)
+  if (written == len)
     return MSG_OK;
   else
     return MSG_RESET;

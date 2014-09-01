@@ -63,9 +63,10 @@ static const MtdConfig mtd_cfg = {
 static EepromMtd eemtd(&mtd_cfg, &eeprom_cfg);
 static EepromFs eefs(eemtd);
 
-static uint8_t mtdbuf[EEPROM_PAGE_SIZE * EEPROM_PAGE_COUNT];
-static uint8_t refbuf[EEPROM_PAGE_SIZE * EEPROM_PAGE_COUNT];
-static uint8_t filebuf[EEPROM_PAGE_SIZE * EEPROM_PAGE_COUNT];
+#define TEST_BUF_LEN          (EEPROM_PAGE_SIZE * EEPROM_PAGE_COUNT)
+static uint8_t mtdbuf[TEST_BUF_LEN];
+static uint8_t refbuf[TEST_BUF_LEN];
+static uint8_t filebuf[TEST_BUF_LEN];
 
 /*
  ******************************************************************************
@@ -237,15 +238,32 @@ static void file_test(EepromFile *eef){
   osalDbgCheck(u16 == eef->getU16());
 }
 
-static void addres_translate_test(void){
-  memset(refbuf, 0x00, sizeof(refbuf));
-  memset(mtdbuf, , sizeof(mtdbuf));
-  memset(filebuf, pattern, len);
+static void __addres_translate_test(size_t writesize){
+  const uint8_t watermark = 0xFF;
+  const uint8_t databyte = 'U';
+  const size_t testoffset = 125;
+
+  memset(mtdbuf, watermark, TEST_BUF_LEN);
+  eemtd.write(mtdbuf, TEST_BUF_LEN, 0);
 
   EepromFile eef;
-  eef.__test_ctor(&eemtd, EEPROM_PAGE_SIZE * 2, EEPROM_PAGE_SIZE);
-  file_test(&eef);
+  eef.__test_ctor(&eemtd, testoffset, writesize * 2);
+  memset(mtdbuf, databyte, TEST_BUF_LEN);
+  eef.write(mtdbuf, writesize);
+
+  /* check */
+  memset(refbuf, watermark, TEST_BUF_LEN);
+  memset(refbuf+testoffset, databyte, writesize);
+  eemtd.read(filebuf, TEST_BUF_LEN, 0);
+  osalDbgCheck(0 == memcmp(refbuf, filebuf, TEST_BUF_LEN));
 }
+
+static void addres_translate_test(void){
+  __addres_translate_test(EEPROM_PAGE_SIZE);
+  __addres_translate_test(EEPROM_PAGE_SIZE - 1);
+  __addres_translate_test(EEPROM_PAGE_SIZE - 1);
+}
+
 /*
  ******************************************************************************
  * EXPORTED FUNCTIONS
@@ -255,7 +273,10 @@ static void addres_translate_test(void){
 void testEepromMtd(void){
   size_t df, df2;
   EepromFile *test0, *test1, *test2, *test3;
+
   get_size_check(eemtd);
+
+  addres_translate_test();
 
   write_align_check(eemtd);
   write_misalign_check(eemtd);
