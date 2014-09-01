@@ -24,7 +24,7 @@
 #include "ch.hpp"
 #include "hal.h"
 
-#include "eeprom_fs.hpp"
+#include "nvram_fs.hpp"
 
 /*
  ******************************************************************************
@@ -56,7 +56,7 @@
  */
 
 #include "eeprom_mtd.hpp"
-#include "eeprom_fs.hpp"
+#include "nvram_fs.hpp"
 
 static const EepromConfig eeprom_cfg = {
   OSAL_MS2ST(5),
@@ -70,7 +70,7 @@ static const MtdConfig mtd_cfg = {
 };
 
 static EepromMtd eemtd(&mtd_cfg, &eeprom_cfg);
-static EepromFs eefs(eemtd);
+static NvramFs eefs(eemtd);
 
 #define TEST_BUF_LEN          (EEPROM_PAGE_SIZE * EEPROM_PAGE_COUNT)
 static uint8_t mtdbuf[TEST_BUF_LEN];
@@ -219,7 +219,7 @@ static void get_size_check(EepromMtd &mtd){
   osalDbgCheck((EEPROM_PAGE_COUNT * EEPROM_PAGE_SIZE) == mtd.capacity());
 }
 
-static void file_test(EepromFile *eef){
+static void file_test(NvramFile *eef){
 
   uint16_t u16 = 0x0102;
   uint32_t u32 = 0x03040506;
@@ -255,7 +255,7 @@ static void __addres_translate_test(size_t writesize){
   memset(mtdbuf, watermark, TEST_BUF_LEN);
   eemtd.write(mtdbuf, TEST_BUF_LEN, 0);
 
-  EepromFile eef;
+  NvramFile eef;
   eef.__test_ctor(&eemtd, testoffset, writesize * 2);
   memset(mtdbuf, databyte, TEST_BUF_LEN);
   eef.write(mtdbuf, writesize);
@@ -279,9 +279,9 @@ static void addres_translate_test(void){
  ******************************************************************************
  */
 
-void testEepromMtd(void){
+void testNvram(void){
   size_t df, df2;
-  EepromFile *test0, *test1, *test2, *test3;
+  NvramFile *test0, *test1, *test2, *test3;
 
   get_size_check(eemtd);
 
@@ -291,7 +291,7 @@ void testEepromMtd(void){
   write_misalign_check(eemtd);
 
   {
-    EepromFile eef;
+    NvramFile eef;
     eef.__test_ctor(&eemtd, EEPROM_PAGE_SIZE * 2, EEPROM_PAGE_SIZE);
     file_test(&eef);
   }

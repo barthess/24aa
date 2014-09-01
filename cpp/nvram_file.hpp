@@ -19,16 +19,16 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef EEPROM_FILE_CPP_H_
-#define EEPROM_FILE_CPP_H_
+#ifndef NVRAM_FILE_HPP_
+#define NVRAM_FILE_HPP_
 
 #include "fs.hpp"
 #include "mtd.hpp"
 
-class EepromFile : public chibios_fs::BaseFileStreamInterface{
-  friend class EepromFs;
+class NvramFile : public chibios_fs::BaseFileStreamInterface{
+  friend class NvramFs;
 public:
-  EepromFile(void);
+  NvramFile(void);
   void __test_ctor(Mtd *mtd, chibios_fs::fileoffset_t start, chibios_fs::fileoffset_t size);
   uint32_t getAndClearLastError(void);
   chibios_fs::fileoffset_t getSize(void);
@@ -56,4 +56,4 @@ private:
   uint16_t tip;   /* current position in file (bytes) */
 };
 
-#endif /* EEPROM_FILE_CPP_H_ */
+#endif /* NVRAM_FILE_HPP_ */

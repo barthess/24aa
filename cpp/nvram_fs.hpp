@@ -19,11 +19,11 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef EEPROM_FS_HPP_
-#define EEPROM_FS_HPP_
+#ifndef NVRAM_FS_HPP_
+#define NVRAM_FS_HPP_
 
-#include "eeprom_mtd.hpp"
-#include "eeprom_file.hpp"
+#include "mtd.hpp"
+#include "nvram_file.hpp"
 
 #define MAX_FILE_NAME_LEN     8
 #define MAX_FILE_CNT          3
@@ -49,12 +49,12 @@ typedef struct {
 /**
  *
  */
-class EepromFs {
+class NvramFs {
 public:
-  EepromFs(Mtd &mtd);
-  EepromFile *open(const char *name);
-  void close(EepromFile *f);
-  EepromFile *create(const char *name, chibios_fs::fileoffset_t size);
+  NvramFs(Mtd &mtd);
+  NvramFile *open(const char *name);
+  void close(NvramFile *f);
+  NvramFile *create(const char *name, chibios_fs::fileoffset_t size);
   bool mount(void);
   bool umount(void);
   bool mkfs(void);
@@ -74,12 +74,12 @@ private:
   void gc(void);
   int find(const char *name, toc_item_t *ti);
   Mtd &mtd;
-  EepromFile super;
-  EepromFile fat[MAX_FILE_CNT];
+  NvramFile super;
+  NvramFile fat[MAX_FILE_CNT];
   /* counter of opened files. In unmounted state this value must be 0.
    * After mounting it must be set to 1 denoting successful mount. Every
    * 'open' operation must increment it and every 'close' must decrement it. */
   uint8_t files_opened;
 };
 
-#endif /* EEPROM_FS_HPP_ */
+#endif /* NVRAM_FS_HPP_ */

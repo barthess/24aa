@@ -1,5 +1,4 @@
 /*
-/*
     Abstraction layer for EEPROM ICs.
 
     Copyright (C) 2012,2013,2014 Uladzimir Pylinski aka barthess
@@ -23,7 +22,7 @@
 #include "ch.hpp"
 #include "hal.h"
 
-#include "eeprom_file.hpp"
+#include "nvram_file.hpp"
 
 using namespace chibios_fs;
 
@@ -61,7 +60,7 @@ using namespace chibios_fs;
 /**
  *
  */
-msg_t EepromFile::put(uint8_t b){
+msg_t NvramFile::put(uint8_t b){
   (void)b;
   osalSysHalt("Unrealized");
   return 0;
@@ -70,7 +69,7 @@ msg_t EepromFile::put(uint8_t b){
 /**
  *
  */
-msg_t EepromFile::get(void){
+msg_t NvramFile::get(void){
   osalSysHalt("Unrealized");
   return 0;
 }
@@ -78,7 +77,7 @@ msg_t EepromFile::get(void){
 /**
  *
  */
-uint32_t EepromFile::getAndClearLastError(void){
+uint32_t NvramFile::getAndClearLastError(void){
   osalSysHalt("Unrealized");
   return 0;
 }
@@ -91,14 +90,14 @@ uint32_t EepromFile::getAndClearLastError(void){
 /**
  *
  */
-EepromFile::EepromFile(void) {
+NvramFile::NvramFile(void) {
   return;
 }
 
 /**
  *
  */
-void EepromFile::__test_ctor(Mtd *mtd, fileoffset_t start, fileoffset_t size){
+void NvramFile::__test_ctor(Mtd *mtd, fileoffset_t start, fileoffset_t size){
   this->mtd = mtd;
   this->tip = 0;
   this->start = start;
@@ -108,7 +107,7 @@ void EepromFile::__test_ctor(Mtd *mtd, fileoffset_t start, fileoffset_t size){
 /**
  *
  */
-size_t EepromFile::clamp_size(size_t n){
+size_t NvramFile::clamp_size(size_t n){
   size_t p = getPosition();
   size_t s = getSize();
   if ((p + n) > s)
@@ -120,7 +119,7 @@ size_t EepromFile::clamp_size(size_t n){
 /**
  *
  */
-void EepromFile::close(void){
+void NvramFile::close(void){
   this->mtd = NULL;
   this->tip = 0;
   this->start = 0;
@@ -130,7 +129,7 @@ void EepromFile::close(void){
 /**
  *
  */
-fileoffset_t EepromFile::getSize(void){
+fileoffset_t NvramFile::getSize(void){
   osalDbgAssert(NULL != this->mtd, "File not opened");
   return size;
 }
@@ -138,7 +137,7 @@ fileoffset_t EepromFile::getSize(void){
 /**
  *
  */
-fileoffset_t EepromFile::getPosition(void){
+fileoffset_t NvramFile::getPosition(void){
   osalDbgAssert(NULL != this->mtd, "File not opened");
   return tip;
 }
@@ -146,7 +145,7 @@ fileoffset_t EepromFile::getPosition(void){
 /**
  *
  */
-uint32_t EepromFile::setPosition(fileoffset_t offset){
+uint32_t NvramFile::setPosition(fileoffset_t offset){
   osalDbgAssert(NULL != this->mtd, "File not opened");
 
   uint32_t size = getSize();
@@ -161,7 +160,7 @@ uint32_t EepromFile::setPosition(fileoffset_t offset){
 /**
  *
  */
-size_t EepromFile::read(uint8_t *buf, size_t n){
+size_t NvramFile::read(uint8_t *buf, size_t n){
 
   osalDbgAssert(NULL != this->mtd, "File not opened");
   osalDbgCheck(NULL != buf);
@@ -181,7 +180,7 @@ size_t EepromFile::read(uint8_t *buf, size_t n){
 /**
  *
  */
-size_t EepromFile::write(const uint8_t *buf, size_t n){
+size_t NvramFile::write(const uint8_t *buf, size_t n){
 
   osalDbgAssert(NULL != this->mtd, "File not opened");
   osalDbgCheck(NULL != buf);
@@ -201,7 +200,7 @@ size_t EepromFile::write(const uint8_t *buf, size_t n){
 /**
  *
  */
-uint64_t EepromFile::getU64(void){
+uint64_t NvramFile::getU64(void){
   uint64_t ret;
   read((uint8_t *)&ret, sizeof(ret));
   return ret;
@@ -210,7 +209,7 @@ uint64_t EepromFile::getU64(void){
 /**
  *
  */
-uint32_t EepromFile::getU32(void){
+uint32_t NvramFile::getU32(void){
   uint32_t ret;
   read((uint8_t *)&ret, sizeof(ret));
   return ret;
@@ -219,7 +218,7 @@ uint32_t EepromFile::getU32(void){
 /**
  *
  */
-uint16_t EepromFile::getU16(void){
+uint16_t NvramFile::getU16(void){
   uint16_t ret;
   read((uint8_t *)&ret, sizeof(ret));
   return ret;
@@ -228,20 +227,20 @@ uint16_t EepromFile::getU16(void){
 /**
  *
  */
-size_t EepromFile::putU64(uint64_t data){
+size_t NvramFile::putU64(uint64_t data){
   return write((uint8_t *)&data, sizeof(data));
 }
 
 /**
  *
  */
-size_t EepromFile::putU32(uint32_t data){
+size_t NvramFile::putU32(uint32_t data){
   return write((uint8_t *)&data, sizeof(data));
 }
 
 /**
  *
  */
-size_t EepromFile::putU16(uint16_t data){
+size_t NvramFile::putU16(uint16_t data){
   return write((uint8_t *)&data, sizeof(data));
 }

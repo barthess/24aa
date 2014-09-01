@@ -19,9 +19,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef TEST_EEPROM_MTD_HPP_
-#define TEST_EEPROM_MTD_HPP_
+#ifndef TEST_NVRAM_HPP_
+#define TEST_NVRAM_HPP_
 
-void testEepromMtd(void);
+void testNvram(void);
 
-#endif /* TEST_EEPROM_MTD_HPP_ */
+#endif /* TEST_NVRAM_HPP_ */

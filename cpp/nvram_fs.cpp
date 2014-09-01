@@ -22,7 +22,7 @@
 #include <ctype.h>
 #include <string.h>
 
-#include "eeprom_fs.hpp"
+#include "nvram_fs.hpp"
 
 using namespace chibios_fs;
 
@@ -77,7 +77,7 @@ static const fileoffset_t FAT_OFFSET = sizeof(magic) + 1;  /* 1 is for storing f
 /**
  *
  */
-void EepromFs::open_super(void) {
+void NvramFs::open_super(void) {
   super.mtd = &mtd;
   super.tip = 0;
   super.start = 0;
@@ -123,7 +123,7 @@ static bool check_name(const char *buf, size_t len) {
 /**
  *
  */
-bool EepromFs::mkfs(void) {
+bool NvramFs::mkfs(void) {
 
   uint8_t buf[sizeof(toc_item_t)];
   uint8_t checksum = xorbuf(magic, sizeof(magic));
@@ -166,7 +166,7 @@ FAILED:
 /**
  *
  */
-void EepromFs::get_magic(uint8_t *result){
+void NvramFs::get_magic(uint8_t *result){
   uint32_t status;
 
   status = super.setPosition(0);
@@ -179,7 +179,7 @@ void EepromFs::get_magic(uint8_t *result){
 /**
  *
  */
-uint8_t EepromFs::get_checksum(void){
+uint8_t NvramFs::get_checksum(void){
   uint8_t buf[1];
   uint32_t status;
 
@@ -195,7 +195,7 @@ uint8_t EepromFs::get_checksum(void){
 /**
  * @brief   Recalculate and write checksum
  */
-void EepromFs::seal(void){
+void NvramFs::seal(void){
 
   uint8_t buf[sizeof(toc_item_t)];
   uint8_t checksum;
@@ -221,7 +221,7 @@ void EepromFs::seal(void){
 /**
  *
  */
-uint8_t EepromFs::get_file_cnt(void){
+uint8_t NvramFs::get_file_cnt(void){
   uint8_t buf[1];
   uint32_t status;
 
@@ -237,7 +237,7 @@ uint8_t EepromFs::get_file_cnt(void){
 /**
  *
  */
-void EepromFs::write_file_cnt(uint8_t cnt){
+void NvramFs::write_file_cnt(uint8_t cnt){
 
   uint32_t status;
 
@@ -251,7 +251,7 @@ void EepromFs::write_file_cnt(uint8_t cnt){
 /**
  *
  */
-void EepromFs::get_toc_item(toc_item_t *result, size_t num){
+void NvramFs::get_toc_item(toc_item_t *result, size_t num){
   osalDbgCheck(num < MAX_FILE_CNT);
   uint32_t status;
   const size_t blocklen = sizeof(toc_item_t);
@@ -266,7 +266,7 @@ void EepromFs::get_toc_item(toc_item_t *result, size_t num){
 /**
  *
  */
-void EepromFs::write_toc_item(const toc_item_t *ti, uint8_t num){
+void NvramFs::write_toc_item(const toc_item_t *ti, uint8_t num){
 
   uint32_t status;
   const size_t blocklen = sizeof(toc_item_t);
@@ -284,7 +284,7 @@ void EepromFs::write_toc_item(const toc_item_t *ti, uint8_t num){
 /**
  *
  */
-bool EepromFs::fsck(void) {
+bool NvramFs::fsck(void) {
 
   fileoffset_t first_empty_byte;
   uint8_t buf[sizeof(toc_item_t)];
@@ -341,7 +341,7 @@ FAILED:
 /**
  * @brief   Delete reference to file from superblock
  */
-void EepromFs::ulink(int id){
+void NvramFs::ulink(int id){
   (void)id;
   osalSysHalt("Unrealized");
 }
@@ -349,7 +349,7 @@ void EepromFs::ulink(int id){
 /**
  * @brief   Consolidate free space after file deletion
  */
-void EepromFs::gc(void){
+void NvramFs::gc(void){
   osalSysHalt("Unrealized");
 }
 
@@ -361,7 +361,7 @@ void EepromFs::gc(void){
 /**
  *
  */
-EepromFs::EepromFs(Mtd &mtd) :
+NvramFs::NvramFs(Mtd &mtd) :
 mtd(mtd),
 files_opened(0)
 {
@@ -371,7 +371,7 @@ files_opened(0)
 /**
  *
  */
-bool EepromFs::mount(void) {
+bool NvramFs::mount(void) {
 
   /* already mounted */
   if (this->files_opened > 1)
@@ -394,7 +394,7 @@ FAILED:
 /**
  *
  */
-bool EepromFs::umount(void) {
+bool NvramFs::umount(void) {
 
   /* FS has some opened files */
   if (this->files_opened > 1)
@@ -409,7 +409,7 @@ bool EepromFs::umount(void) {
 /**
  *
  */
-int EepromFs::find(const char *name, toc_item_t *ti){
+int NvramFs::find(const char *name, toc_item_t *ti){
   size_t i = 0;
 
   for (i=0; i<MAX_FILE_CNT; i++){
@@ -424,7 +424,7 @@ int EepromFs::find(const char *name, toc_item_t *ti){
 /**
  *
  */
-EepromFile * EepromFs::create(const char *name, chibios_fs::fileoffset_t size){
+NvramFile * NvramFs::create(const char *name, chibios_fs::fileoffset_t size){
   toc_item_t ti;
   int id = -1;
   size_t file_cnt;
@@ -472,7 +472,7 @@ EepromFile * EepromFs::create(const char *name, chibios_fs::fileoffset_t size){
 /**
  *
  */
-EepromFile *EepromFs::open(const char *name){
+NvramFile * NvramFs::open(const char *name){
   toc_item_t ti;
   int id = -1;
 
@@ -497,7 +497,7 @@ EepromFile *EepromFs::open(const char *name){
 /**
  *
  */
-void EepromFs::close(EepromFile *f) {
+void NvramFs::close(NvramFile *f) {
   osalDbgAssert(this->files_opened > 0, "FS not mounted");
 
   f->close();
@@ -507,7 +507,7 @@ void EepromFs::close(EepromFile *f) {
 /**
  * @brief   Return free disk space
  */
-fileoffset_t EepromFs::df(void){
+fileoffset_t NvramFs::df(void){
 
   toc_item_t ti;
   size_t file_cnt;
@@ -527,7 +527,7 @@ fileoffset_t EepromFs::df(void){
 /**
  *
  */
-bool EepromFs::rm(const char *name){
+bool NvramFs::rm(const char *name){
   toc_item_t ti;
   int id = -1;
 
