@@ -81,13 +81,16 @@ expected.
  ******************************************************************************
  */
 /**
+ *
+ */
+void EepromMtd::wait_for_sync(void){
+  chThdSleep(eeprom_cfg->writetime);
+}
+
+/**
  * @brief   Write data that can be fitted in single page boundary
  */
-void EepromMtd::fitted_write(const uint8_t *data, size_t len,
-                            size_t offset, uint32_t *written){
-  msg_t status = MSG_RESET;
-
-  eeprom_led_on();
+size_t EepromMtd::fitted_write(const uint8_t *data, size_t len, size_t offset){
 
   osalDbgAssert(len != 0, "something broken in higher level");
   osalDbgAssert((offset + len) <= (eeprom_cfg->pages * eeprom_cfg->pagesize),
@@ -96,20 +99,7 @@ void EepromMtd::fitted_write(const uint8_t *data, size_t len,
              ((offset + len - 1) / eeprom_cfg->pagesize)),
              "Data can not be fitted in single page");
 
-  this->acquire();
-
-  split_addr(writebuf, offset);          /* write address bytes */
-  memcpy(&(writebuf[2]), data, len);        /* write data bytes */
-  status = busTransmit(writebuf, len+2);
-
-  /* wait until EEPROM process data */
-  chThdSleep(eeprom_cfg->writetime);
-  this->release();
-  eeprom_led_off();
-
-  if (status == MSG_OK){
-    *written += len;
-  }
+  return write_impl(data, len, offset);
 }
 
 /*
@@ -125,8 +115,8 @@ EepromMtd::EepromMtd(const MtdConfig *mtd_cfg, const EepromConfig *eeprom_cfg) :
 Mtd(mtd_cfg),
 eeprom_cfg(eeprom_cfg)
 {
-  osalDbgAssert(sizeof(writebuf) == eeprom_cfg->pagesize + 2,
-          "Buffer size must be equal pagesize + 2 bytes for address");
+  osalDbgAssert(sizeof(writebuf) == eeprom_cfg->pagesize + NVRAM_ADDRESS_BYTES,
+      "Buffer size must be equal pagesize + address bytes");
 }
 
 /**
@@ -137,7 +127,7 @@ msg_t EepromMtd::write(const uint8_t *bp, size_t len, size_t offset){
   /* bytes to be written at one transaction */
   size_t L = 0;
   /* total bytes successfully written */
-  uint32_t written = 0;
+  size_t written = 0;
   /* cached value */
   uint16_t pagesize = eeprom_cfg->pagesize;
   /* first page to be affected during transaction */
@@ -148,7 +138,7 @@ msg_t EepromMtd::write(const uint8_t *bp, size_t len, size_t offset){
   /* data fits in single page */
   if (firstpage == lastpage){
     L = len;
-    fitted_write(bp, L, offset, &written);
+    written += fitted_write(bp, L, offset);
     bp += L;
     offset += L;
     goto EXIT;
@@ -156,14 +146,14 @@ msg_t EepromMtd::write(const uint8_t *bp, size_t len, size_t offset){
   else{
     /* write first piece of data to the first page boundary */
     L = firstpage * pagesize + pagesize - offset;
-    fitted_write(bp, L, offset, &written);
+    written += fitted_write(bp, L, offset);
     bp += L;
     offset += L;
 
     /* now writes blocks at a size of pages (may be no one) */
     L = pagesize;
     while ((len - written) > pagesize){
-      fitted_write(bp, L, offset, &written);
+      written += fitted_write(bp, L, offset);
       bp += L;
       offset += L;
     }
@@ -173,7 +163,7 @@ msg_t EepromMtd::write(const uint8_t *bp, size_t len, size_t offset){
     if (0 == L)
       goto EXIT;
     else{
-      fitted_write(bp, L, offset, &written);
+      written += fitted_write(bp, L, offset);
     }
   }
 
@@ -189,22 +179,10 @@ EXIT:
  */
 msg_t EepromMtd::shred(uint8_t pattern){
 
-  msg_t status = MSG_RESET;
+  osalDbgAssert(sizeof(writebuf) == eeprom_cfg->pagesize + NVRAM_ADDRESS_BYTES,
+          "Buffer size must be equal pagesize + address bytes");
 
-  eeprom_led_on();
-  this->acquire();
-
-  memset(writebuf, pattern, sizeof(writebuf));
-  for (size_t i=0; i<eeprom_cfg->pages; i++){
-    split_addr(writebuf, i * eeprom_cfg->pagesize);
-    status = busTransmit(writebuf, sizeof(writebuf));
-    osalDbgCheck(MSG_OK == status);
-    chThdSleep(eeprom_cfg->writetime);
-  }
-
-  this->release();
-  eeprom_led_off();
-  return MSG_OK;
+  return shred_impl(pattern);
 }
 
 /**
@@ -215,16 +193,9 @@ size_t EepromMtd::capacity(void){
 }
 
 /**
- *
- */
-size_t EepromMtd::page_size(void){
-  return eeprom_cfg->pagesize;
-}
-
-/**
  * @brief   Move big block of data.
  */
-msg_t EepromMtd::move(size_t blklen, size_t blkoffset, int32_t shift){
+msg_t EepromMtd::datamove(size_t blklen, size_t blkoffset, int32_t shift){
   msg_t status = MSG_RESET;
 
   osalSysHalt("Unfinished function");

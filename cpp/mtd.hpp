@@ -27,16 +27,26 @@
 
 #include "mtd_conf.h"
 
+#define NVRAM_ADDRESS_BYTES                     2
+
+#if !defined(MTD_USE_MUTUAL_EXCLUSION)
+#define MTD_USE_MUTUAL_EXCLUSION                FALSE
+#endif
+
+#if !defined(MTD_WRITE_BUF_SIZE)
+#define MTD_WRITE_BUF_SIZE                      (32 + NVRAM_ADDRESS_BYTES)
+#endif
+
 /**
  *
  */
 typedef struct {
   /**
-   * Driver connecte to IC.
+   * Driver connected to NVRAM IC.
    */
   I2CDriver     *i2cp;
   /**
-   * Address of IC on I2C bus.
+   * Address of NVRAM IC on I2C bus.
    */
   i2caddr_t     addr;
 }MtdConfig;
@@ -49,11 +59,13 @@ public:
   Mtd(const MtdConfig *cfg);
   msg_t read(uint8_t *data, size_t len, size_t offset);
   virtual msg_t write(const uint8_t *data, size_t len, size_t offset) = 0;
-  virtual msg_t move(size_t blklen, size_t blkoffset, int32_t shift) = 0;
+  virtual msg_t datamove(size_t blklen, size_t blkoffset, int32_t shift) = 0;
   virtual msg_t shred(uint8_t pattern) = 0;
   virtual size_t capacity(void) = 0;
-  virtual size_t page_size(void) = 0;
 protected:
+  msg_t shred_impl(uint8_t pattern);
+  size_t write_impl(const uint8_t *data, size_t len, size_t offset);
+  virtual void wait_for_sync(void) = 0;
   msg_t busTransmit(const uint8_t *txbuf, size_t txbytes);
   msg_t busReceive(uint8_t *rxbuf, size_t rxbytes);
   msg_t stm32_f1x_read_byte(uint8_t *data, size_t offset);

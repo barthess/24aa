@@ -19,6 +19,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <string.h>
+
 #include "ch.hpp"
 
 #include "mtd.hpp"
@@ -149,6 +151,54 @@ msg_t Mtd::read(uint8_t *data, size_t len, size_t offset){
   this->release();
 
   return status;
+}
+
+/**
+ * @brief   Write data that can be fitted in single page boundary
+ */
+size_t Mtd::write_impl(const uint8_t *data, size_t len, size_t offset){
+  msg_t status = MSG_RESET;
+
+  eeprom_led_on();
+  this->acquire();
+
+  split_addr(writebuf, offset);             /* store address bytes */
+  memcpy(&(writebuf[2]), data, len);        /* store data bytes */
+  status = busTransmit(writebuf, len+2);
+
+  wait_for_sync();
+  this->release();
+  eeprom_led_off();
+
+  if (status == MSG_OK)
+    return len;
+  else
+    return 0;
+}
+
+/**
+ *
+ */
+msg_t Mtd::shred_impl(uint8_t pattern){
+  msg_t status = MSG_RESET;
+
+  eeprom_led_on();
+  this->acquire();
+
+  size_t blocksize = (sizeof(writebuf) - NVRAM_ADDRESS_BYTES);
+  size_t total_writes = capacity() / blocksize;
+
+  memset(writebuf, pattern, sizeof(writebuf));
+  for (size_t i=0; i<total_writes; i++){
+    split_addr(writebuf, i * blocksize);
+    status = busTransmit(writebuf, sizeof(writebuf));
+    osalDbgCheck(MSG_OK == status);
+    wait_for_sync();
+  }
+
+  this->release();
+  eeprom_led_off();
+  return MSG_OK;
 }
 
 /**

@@ -12,32 +12,13 @@ EEPROM like a regular file(s).
 * No 'RAID' like combining
 
 3. USAGE 
-3.1. C
-
-* Include eeprom.h file to your project.
-* Create eeprom_conf.h (sample included) in your project.
-* Define file object of a EepromFileStream type
-  and config structure for it.
-* Open them with EepromOpen() function.
-
-Now you can access to EEPROM array like to a regular file with functions:
-- chFileStreamRead()
-- chFileStreamWrite()
-- chFileStreamGetPosition()
-- chFileStreamSeek()
-etc. 
-
-Examples of usage and checking the returning parameter you can found in
-eeprom_testsuit.c
-
-3.2. CPP 
-Example of CPP code you can find in 'cpp_example' directory. Also 
-check 'eeprom_testsuit.cpp'.
+ 
+Example of CPP code you can find in 'test_nvram.cpp'. 
 
 Note! You have to provide fucntions eeprom_led_on() and eeprom_led_off()
-in your eeprom_mtd_conf.h If you do not need such functionality just 
+in your mtd_conf.h If you do not need such functionality just 
 define empty macros. 
 
 
 Author: Uladzimir Pylinski aka barthess (barthess@yandex.ru). 
-06.02.2012 
+01.09.2014

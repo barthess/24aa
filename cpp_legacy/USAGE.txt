@@ -1,0 +1,6 @@
+Example of CPP code you can find in 'example' directory. Also 
+check 'eeprom_testsuit.cpp'.
+
+Note! You have to provide fucntions eeprom_led_on() and eeprom_led_off()
+in your mtd_conf.h If you do not need such functionality just 
+define empty macros. 

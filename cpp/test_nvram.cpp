@@ -273,6 +273,21 @@ static void addres_translate_test(void){
   __addres_translate_test(EEPROM_PAGE_SIZE - 1);
 }
 
+static void shred_test(void){
+  const uint8_t watermark = 0xFF;
+  const uint8_t databyte = 'U';
+
+  memset(refbuf, watermark, TEST_BUF_LEN);
+  eemtd.shred(watermark);
+  eemtd.read(filebuf, TEST_BUF_LEN, 0);
+  osalDbgCheck(0 == memcmp(refbuf, filebuf, TEST_BUF_LEN));
+
+  memset(refbuf, databyte, TEST_BUF_LEN);
+  eemtd.shred(databyte);
+  eemtd.read(filebuf, TEST_BUF_LEN, 0);
+  osalDbgCheck(0 == memcmp(refbuf, filebuf, TEST_BUF_LEN));
+}
+
 /*
  ******************************************************************************
  * EXPORTED FUNCTIONS
@@ -284,6 +299,8 @@ void testNvram(void){
   NvramFile *test0, *test1, *test2, *test3;
 
   get_size_check(eemtd);
+
+  shred_test();
 
   addres_translate_test();
 

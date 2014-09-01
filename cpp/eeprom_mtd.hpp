@@ -54,10 +54,10 @@ public:
   msg_t write(const uint8_t *data, size_t len, size_t offset);
   msg_t shred(uint8_t pattern);
   size_t capacity(void);
-  size_t page_size(void);
-  msg_t move(size_t blklen, size_t blkoffset, int32_t shift);
+  msg_t datamove(size_t blklen, size_t blkoffset, int32_t shift);
 private:
-  void fitted_write(const uint8_t *data, size_t len, size_t offset, uint32_t *written);
+  void wait_for_sync(void);
+  size_t fitted_write(const uint8_t *data, size_t len, size_t offset);
   const EepromConfig *eeprom_cfg;
 };
 
