@@ -24,6 +24,15 @@
 #include "ch.hpp"
 #include "hal.h"
 
+/* use this switch to build FRAM test instead of EEPROM */
+#define USE_FRAM_TEST     FALSE
+
+#if USE_FRAM_TEST
+  #include "fram_mtd.hpp"
+#else
+  #include "eeprom_mtd.hpp"
+#endif
+
 #include "nvram_fs.hpp"
 
 /*
@@ -32,10 +41,18 @@
  ******************************************************************************
  */
 
-#define EEPROM_I2CD             I2CD1
-#define EEPROM_I2C_ADDR         0b1010000   /* EEPROM address on bus */
-#define EEPROM_PAGE_SIZE        32
-#define EEPROM_PAGE_COUNT       128
+#define NVRAM_I2CD                I2CD3
+#if USE_FRAM_TEST
+  #define NVRAM_I2C_ADDR          0b1010000   /* FRAM address on bus */
+  #define EEPROM_PAGE_SIZE        32          /* fake value for testing */
+  #define EEPROM_PAGE_COUNT       1024        /* fake value for testing */
+  #define FRAM_SIZE               (EEPROM_PAGE_SIZE * EEPROM_PAGE_COUNT)
+#else
+  #define NVRAM_I2C_ADDR          0b1010001   /* EEPROM address on bus */
+  #define EEPROM_PAGE_SIZE        32
+  #define EEPROM_PAGE_COUNT       256
+#endif
+#define TEST_BUF_LEN            (EEPROM_PAGE_SIZE * EEPROM_PAGE_COUNT)
 
 /*
  ******************************************************************************
@@ -54,25 +71,31 @@
  * GLOBAL VARIABLES
  ******************************************************************************
  */
-
-#include "eeprom_mtd.hpp"
-#include "nvram_fs.hpp"
-
+#if USE_FRAM_TEST
+static const FramConfig fram_cfg = {
+  FRAM_SIZE
+};
+#else
 static const EepromConfig eeprom_cfg = {
   OSAL_MS2ST(5),
   EEPROM_PAGE_COUNT,
   EEPROM_PAGE_SIZE,
 };
+#endif
 
 static const MtdConfig mtd_cfg = {
-  &EEPROM_I2CD,
-  EEPROM_I2C_ADDR,
+  &NVRAM_I2CD,
+  NVRAM_I2C_ADDR,
 };
 
-static EepromMtd eemtd(&mtd_cfg, &eeprom_cfg);
-static NvramFs eefs(eemtd);
+#if USE_FRAM_TEST
+static FramMtd nvmtd(&mtd_cfg, &fram_cfg);
+#else
+static EepromMtd nvmtd(&mtd_cfg, &eeprom_cfg);
+#endif
 
-#define TEST_BUF_LEN          (EEPROM_PAGE_SIZE * EEPROM_PAGE_COUNT)
+static NvramFs nvfs(nvmtd);
+
 static uint8_t mtdbuf[TEST_BUF_LEN];
 static uint8_t refbuf[TEST_BUF_LEN];
 static uint8_t filebuf[TEST_BUF_LEN];
@@ -85,7 +108,7 @@ static uint8_t filebuf[TEST_BUF_LEN];
  ******************************************************************************
  */
 
-static void __write_align_check(EepromMtd &mtd, uint8_t pattern, size_t pagenum){
+static void __write_align_check(Mtd &mtd, uint8_t pattern, size_t pagenum){
   size_t offset = EEPROM_PAGE_SIZE * pagenum;
   msg_t status = MSG_RESET;
 
@@ -99,7 +122,7 @@ static void __write_align_check(EepromMtd &mtd, uint8_t pattern, size_t pagenum)
   osalDbgCheck(0 == memcmp(refbuf, mtdbuf, EEPROM_PAGE_SIZE));
 }
 
-static void write_align_check(EepromMtd &mtd){
+static void write_align_check(Mtd &mtd){
   __write_align_check(mtd, 0x00, 0);
   __write_align_check(mtd, 0x55, 0);
   __write_align_check(mtd, 0xAA, 0);
@@ -121,7 +144,7 @@ static void write_align_check(EepromMtd &mtd){
   __write_align_check(mtd, 0xFF, EEPROM_PAGE_COUNT - 2);
 }
 
-static void __write_check(EepromMtd &mtd, uint8_t pattern, size_t offset, size_t len){
+static void __write_check(Mtd &mtd, uint8_t pattern, size_t offset, size_t len){
   msg_t status = MSG_RESET;
 
   memset(refbuf, ~pattern, sizeof(refbuf));
@@ -143,7 +166,7 @@ static void __write_check(EepromMtd &mtd, uint8_t pattern, size_t offset, size_t
   osalDbgCheck(0 == memcmp(refbuf, mtdbuf, sizeof(mtdbuf)));
 }
 
-static void write_misalign_check(EepromMtd &mtd) {
+static void write_misalign_check(Mtd &mtd) {
   size_t len;
   size_t offset;
 
@@ -215,7 +238,7 @@ static void write_misalign_check(EepromMtd &mtd) {
   __write_check(mtd, 0x17, offset - 1, len);
 }
 
-static void get_size_check(EepromMtd &mtd){
+static void get_size_check(Mtd &mtd){
   osalDbgCheck((EEPROM_PAGE_COUNT * EEPROM_PAGE_SIZE) == mtd.capacity());
 }
 
@@ -253,17 +276,17 @@ static void __addres_translate_test(size_t writesize){
   const size_t testoffset = 125;
 
   memset(mtdbuf, watermark, TEST_BUF_LEN);
-  eemtd.write(mtdbuf, TEST_BUF_LEN, 0);
+  nvmtd.write(mtdbuf, TEST_BUF_LEN, 0);
 
-  NvramFile eef;
-  eef.__test_ctor(&eemtd, testoffset, writesize * 2);
+  NvramFile f;
+  f.__test_ctor(&nvmtd, testoffset, writesize * 2);
   memset(mtdbuf, databyte, TEST_BUF_LEN);
-  eef.write(mtdbuf, writesize);
+  f.write(mtdbuf, writesize);
 
   /* check */
   memset(refbuf, watermark, TEST_BUF_LEN);
   memset(refbuf+testoffset, databyte, writesize);
-  eemtd.read(filebuf, TEST_BUF_LEN, 0);
+  nvmtd.read(filebuf, TEST_BUF_LEN, 0);
   osalDbgCheck(0 == memcmp(refbuf, filebuf, TEST_BUF_LEN));
 }
 
@@ -278,13 +301,13 @@ static void shred_test(void){
   const uint8_t databyte = 'U';
 
   memset(refbuf, watermark, TEST_BUF_LEN);
-  eemtd.shred(watermark);
-  eemtd.read(filebuf, TEST_BUF_LEN, 0);
+  nvmtd.shred(watermark);
+  nvmtd.read(filebuf, TEST_BUF_LEN, 0);
   osalDbgCheck(0 == memcmp(refbuf, filebuf, TEST_BUF_LEN));
 
   memset(refbuf, databyte, TEST_BUF_LEN);
-  eemtd.shred(databyte);
-  eemtd.read(filebuf, TEST_BUF_LEN, 0);
+  nvmtd.shred(databyte);
+  nvmtd.read(filebuf, TEST_BUF_LEN, 0);
   osalDbgCheck(0 == memcmp(refbuf, filebuf, TEST_BUF_LEN));
 }
 
@@ -298,69 +321,70 @@ void testNvram(void){
   size_t df, df2;
   NvramFile *test0, *test1, *test2, *test3;
 
-  get_size_check(eemtd);
+  get_size_check(nvmtd);
 
   shred_test();
 
   addres_translate_test();
 
-  write_align_check(eemtd);
-  write_misalign_check(eemtd);
+  write_align_check(nvmtd);
+  write_misalign_check(nvmtd);
 
   {
-    NvramFile eef;
-    eef.__test_ctor(&eemtd, EEPROM_PAGE_SIZE * 2, EEPROM_PAGE_SIZE);
-    file_test(&eef);
+    NvramFile f;
+    f.__test_ctor(&nvmtd, EEPROM_PAGE_SIZE * 2, EEPROM_PAGE_SIZE);
+    file_test(&f);
   }
 
-  eemtd.shred(0xFF);
-  osalDbgCheck(OSAL_FAILED  == eefs.mount());
-  osalDbgCheck(OSAL_FAILED  == eefs.fsck());
-  osalDbgCheck(OSAL_SUCCESS == eefs.mkfs());
-  osalDbgCheck(OSAL_SUCCESS == eefs.fsck());
-  osalDbgCheck(OSAL_SUCCESS == eefs.mount());
+  nvmtd.shred(0xFF);
+  osalDbgCheck(OSAL_FAILED  == nvfs.mount());
+  osalDbgCheck(OSAL_FAILED  == nvfs.fsck());
+  osalDbgCheck(OSAL_SUCCESS == nvfs.mkfs());
+  osalDbgCheck(OSAL_SUCCESS == nvfs.fsck());
+  osalDbgCheck(OSAL_SUCCESS == nvfs.mount());
 
-  df = eefs.df();
-  test0 = eefs.create("test0", 1024);
+  df = nvfs.df();
+  test0 = nvfs.create("test0", 1024);
   osalDbgCheck(NULL != test0);
-  df2 = eefs.df();
+  df2 = nvfs.df();
   osalDbgCheck(df2 == (df - 1024));
   memset(mtdbuf, 0x55, sizeof(mtdbuf));
-  osalDbgCheck(MSG_OK == eemtd.read(mtdbuf, sizeof(mtdbuf), 0));
+  osalDbgCheck(MSG_OK == nvmtd.read(mtdbuf, sizeof(mtdbuf), 0));
   file_test(test0);
   memset(mtdbuf, 0x55, sizeof(mtdbuf));
-  osalDbgCheck(MSG_OK == eemtd.read(mtdbuf, sizeof(mtdbuf), 0));
-  eefs.close(test0);
-  test0 = eefs.open("test0");
+  osalDbgCheck(MSG_OK == nvmtd.read(mtdbuf, sizeof(mtdbuf), 0));
+  nvfs.close(test0);
+  test0 = nvfs.open("test0");
   osalDbgCheck(NULL != test0);
-  eefs.close(test0);
-  test0 = eefs.create("test0", 1024);
+  nvfs.close(test0);
+  test0 = nvfs.create("test0", 1024);
   osalDbgCheck(NULL == test0);
 
-  test1 = eefs.create("test1", 32);
+  test1 = nvfs.create("test1", 32);
   osalDbgCheck(NULL != test1);
-  df2 = eefs.df();
+  df2 = nvfs.df();
   osalDbgCheck(df2 == (df - 1024 - 32));
 
-  test2 = eefs.create("test2", 32);
+  test2 = nvfs.create("test2", 32);
   osalDbgCheck(NULL != test2);
-  df2 = eefs.df();
+  df2 = nvfs.df();
   osalDbgCheck(df2 == (df - 1024 - 32 - 32));
 
-  test3 = eefs.create("test3", 32);
+  test3 = nvfs.create("test3", 32);
   osalDbgCheck(NULL == test3);
 
   file_test(test1);
   file_test(test2);
 
-  eefs.close(test1);
-  eefs.close(test2);
+  nvfs.close(test1);
+  nvfs.close(test2);
 
-  osalDbgCheck(OSAL_SUCCESS == eefs.umount());
-  osalDbgCheck(OSAL_SUCCESS == eefs.fsck());
+  osalDbgCheck(OSAL_SUCCESS == nvfs.umount());
+  osalDbgCheck(OSAL_SUCCESS == nvfs.fsck());
 
+  /*  now just read all data from NVRAM for eye check */
   memset(mtdbuf, 0x55, sizeof(mtdbuf));
-  osalDbgCheck(MSG_OK == eemtd.read(mtdbuf, sizeof(mtdbuf), 0));
+  osalDbgCheck(MSG_OK == nvmtd.read(mtdbuf, sizeof(mtdbuf), 0));
 }
 
 

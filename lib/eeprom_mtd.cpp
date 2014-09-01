@@ -122,7 +122,7 @@ eeprom_cfg(eeprom_cfg)
 /**
  *
  */
-msg_t EepromMtd::write(const uint8_t *bp, size_t len, size_t offset){
+msg_t EepromMtd::write(const uint8_t *data, size_t len, size_t offset){
 
   /* bytes to be written at one transaction */
   size_t L = 0;
@@ -138,23 +138,23 @@ msg_t EepromMtd::write(const uint8_t *bp, size_t len, size_t offset){
   /* data fits in single page */
   if (firstpage == lastpage){
     L = len;
-    written += fitted_write(bp, L, offset);
-    bp += L;
+    written += fitted_write(data, L, offset);
+    data += L;
     offset += L;
     goto EXIT;
   }
   else{
     /* write first piece of data to the first page boundary */
     L = firstpage * pagesize + pagesize - offset;
-    written += fitted_write(bp, L, offset);
-    bp += L;
+    written += fitted_write(data, L, offset);
+    data += L;
     offset += L;
 
     /* now writes blocks at a size of pages (may be no one) */
     L = pagesize;
     while ((len - written) > pagesize){
-      written += fitted_write(bp, L, offset);
-      bp += L;
+      written += fitted_write(data, L, offset);
+      data += L;
       offset += L;
     }
 
@@ -163,7 +163,7 @@ msg_t EepromMtd::write(const uint8_t *bp, size_t len, size_t offset){
     if (0 == L)
       goto EXIT;
     else{
-      written += fitted_write(bp, L, offset);
+      written += fitted_write(data, L, offset);
     }
   }
 

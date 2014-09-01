@@ -154,10 +154,13 @@ msg_t Mtd::read(uint8_t *data, size_t len, size_t offset){
 }
 
 /**
- * @brief   Write data that can be fitted in single page boundary
+ * @brief   Write data that can be fitted in single page boundary (for EEPROM)
+ *          on can be placed in write buffer (for FRAM)
  */
 size_t Mtd::write_impl(const uint8_t *data, size_t len, size_t offset){
   msg_t status = MSG_RESET;
+
+  osalDbgCheck((sizeof(writebuf) - NVRAM_ADDRESS_BYTES) >= len);
 
   eeprom_led_on();
   this->acquire();

@@ -57,7 +57,7 @@
 /**
  *
  */
-void EepromMtd::wait_for_sync(void){
+void FramMtd::wait_for_sync(void){
   return;
 }
 
@@ -81,10 +81,31 @@ fram_cfg(fram_cfg)
  *
  */
 msg_t FramMtd::write(const uint8_t *data, size_t len, size_t offset){
-  if (write_impl(data, len, offset) == len)
-    return MSG_OK;
-  else
-    return MSG_RESET;
+
+  size_t written = 0;
+  const size_t blocksize = sizeof(writebuf) - NVRAM_ADDRESS_BYTES;
+  const size_t big_writes = len / blocksize;
+  const size_t small_write_size = len % blocksize;
+
+  /* write big blocks */
+  for (size_t i=0; i<big_writes; i++){
+    written = write_impl(data, blocksize, offset);
+    if (blocksize == written){
+      data += written;
+      offset += written;
+    }
+    else
+      return MSG_RESET;
+  }
+
+  /* write tail (if any) */
+  if (small_write_size > 0){
+    written = write_impl(data, small_write_size, offset);
+    if (small_write_size != written)
+      return MSG_RESET;
+  }
+
+  return MSG_OK; /* */
 }
 
 /**
@@ -97,9 +118,9 @@ size_t FramMtd::capacity(void){
 /**
  *
  */
-msg_t EepromMtd::shred(uint8_t pattern){
+msg_t FramMtd::shred(uint8_t pattern){
 
-  osalDbgAssert(capacity() % (sizeof(writebuf) - NVRAM_ADDRESS_BYTES),
+  osalDbgAssert(0 == (capacity() % (sizeof(writebuf) - NVRAM_ADDRESS_BYTES)),
       "Device size must be divided by write buffer without remainder");
 
   return shred_impl(pattern);
