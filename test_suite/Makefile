@@ -105,11 +105,11 @@ CSRC = $(PORTSRC) \
        $(CHIBIOS)/os/various/shell.c \
        $(CHIBIOS)/os/various/chprintf.c \
        $(CHIBIOS)/os/various/syscalls.c \
-       
+
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
-NVRAMSRC = ../lib
+NVRAMSRC = ../src
 
 CPPSRC = $(CHIBIOS)/os/various/cpp_wrappers/ch.cpp \
          $(CHIBIOS)/os/various/cpp_wrappers/syscalls_cpp.cpp \
@@ -149,7 +149,7 @@ INCDIR = $(PORTINC) $(KERNINC) $(TESTINC) \
          $(CHIBIOS)/os/various \
          $(CHIBIOS)/os/various/cpp_wrappers \
          board devices \
-         ../lib \
+         $(NVRAMSRC) \
          ../test_suite
 
 #
