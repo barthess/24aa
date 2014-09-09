@@ -95,7 +95,7 @@ NvramFile::NvramFile(void) {
 }
 
 /**
- *
+ * @brief     Special constructor for testing. Do not use it.
  */
 void NvramFile::__test_ctor(Mtd *mtd, fileoffset_t start, fileoffset_t size){
   this->mtd = mtd;
