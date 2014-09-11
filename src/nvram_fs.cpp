@@ -541,7 +541,7 @@ bool NvramFs::rm(const char *name){
   if (&mtd == fat[id].mtd)
     return OSAL_FAILED; /* file opened */
 
-  osalSysHalt("Unfinished");
+  osalSysHalt("Functionality unrealized yet");
   ulink(id);
   gc();
   return OSAL_SUCCESS;

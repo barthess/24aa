@@ -200,7 +200,7 @@ msg_t EepromMtd::datamove(size_t blklen, size_t blkoffset, int32_t shift){
 
   osalSysHalt("Unfinished function");
 
-  osalDbgCheck((blklen > 0) && ((blkoffset + blklen) < capacity()));
+  osalDbgAssert((blklen > 0) && ((blkoffset + blklen) < capacity()), "Not enough space");
   osalDbgAssert((shift < 0) && ((blkoffset + shift) <= 0), "Underflow");
   osalDbgAssert((shift > 0) && ((shift + blkoffset) < capacity()), "Overflow");
 
