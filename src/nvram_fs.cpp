@@ -167,7 +167,7 @@ FAILED:
  *
  */
 void NvramFs::get_magic(uint8_t *result){
-  uint32_t status;
+  size_t status;
 
   status = super.setPosition(0);
   osalDbgCheck(FILE_OK == status);
@@ -181,7 +181,7 @@ void NvramFs::get_magic(uint8_t *result){
  */
 uint8_t NvramFs::get_checksum(void){
   uint8_t buf[1];
-  uint32_t status;
+  size_t status;
 
   status = super.setPosition(FAT_OFFSET + sizeof(toc_item_t) * MAX_FILE_CNT);
   osalDbgCheck(FILE_OK == status);
@@ -223,7 +223,7 @@ void NvramFs::seal(void){
  */
 uint8_t NvramFs::get_file_cnt(void){
   uint8_t buf[1];
-  uint32_t status;
+  size_t status;
 
   status = super.setPosition(sizeof(magic));
   osalDbgCheck(FILE_OK == status);
@@ -239,7 +239,7 @@ uint8_t NvramFs::get_file_cnt(void){
  */
 void NvramFs::write_file_cnt(uint8_t cnt){
 
-  uint32_t status;
+  size_t status;
 
   status = super.setPosition(sizeof(magic));
   osalDbgCheck(FILE_OK == status);
@@ -253,7 +253,7 @@ void NvramFs::write_file_cnt(uint8_t cnt){
  */
 void NvramFs::get_toc_item(toc_item_t *result, size_t num){
   osalDbgCheck(num < MAX_FILE_CNT);
-  uint32_t status;
+  size_t status;
   const size_t blocklen = sizeof(toc_item_t);
 
   status = super.setPosition(FAT_OFFSET + num * blocklen);
@@ -268,7 +268,7 @@ void NvramFs::get_toc_item(toc_item_t *result, size_t num){
  */
 void NvramFs::write_toc_item(const toc_item_t *ti, uint8_t num){
 
-  uint32_t status;
+  size_t status;
   const size_t blocklen = sizeof(toc_item_t);
 
   osalDbgCheck(num < MAX_FILE_CNT);
