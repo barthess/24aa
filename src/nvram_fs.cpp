@@ -109,7 +109,6 @@ static bool check_name(const char *buf, size_t len) {
  *
  */
 bool NvramFs::mkfs(void) {
-
   uint8_t buf[sizeof(toc_item_t)];
   uint8_t checksum = xorbuf(magic, sizeof(magic));
   size_t written;
@@ -181,7 +180,6 @@ uint8_t NvramFs::get_checksum(void){
  * @brief   Recalculate and write checksum
  */
 void NvramFs::seal(void){
-
   uint8_t buf[sizeof(toc_item_t)];
   uint8_t checksum;
 
@@ -223,7 +221,6 @@ uint8_t NvramFs::get_file_cnt(void){
  *
  */
 void NvramFs::write_file_cnt(uint8_t cnt){
-
   size_t status;
 
   status = super.setPosition(sizeof(magic));
@@ -237,9 +234,10 @@ void NvramFs::write_file_cnt(uint8_t cnt){
  *
  */
 void NvramFs::get_toc_item(toc_item_t *result, size_t num){
-  osalDbgCheck(num < MAX_FILE_CNT);
   size_t status;
   const size_t blocklen = sizeof(toc_item_t);
+
+  osalDbgCheck(num < MAX_FILE_CNT);
 
   status = super.setPosition(FAT_OFFSET + num * blocklen);
   osalDbgCheck(FILE_OK == status);
@@ -252,7 +250,6 @@ void NvramFs::get_toc_item(toc_item_t *result, size_t num){
  *
  */
 void NvramFs::write_toc_item(const toc_item_t *ti, uint8_t num){
-
   size_t status;
   const size_t blocklen = sizeof(toc_item_t);
 
@@ -270,7 +267,6 @@ void NvramFs::write_toc_item(const toc_item_t *ti, uint8_t num){
  *
  */
 bool NvramFs::fsck(void) {
-
   fileoffset_t first_empty_byte;
   uint8_t buf[sizeof(toc_item_t)];
   uint8_t checksum = xorbuf(magic, sizeof(magic));
@@ -484,6 +480,7 @@ NvramFile * NvramFs::open(const char *name){
  *
  */
 void NvramFs::close(NvramFile *f) {
+
   osalDbgAssert(this->files_opened > 0, "FS not mounted");
 
   f->close();
@@ -494,7 +491,6 @@ void NvramFs::close(NvramFile *f) {
  * @brief   Return free disk space
  */
 fileoffset_t NvramFs::df(void){
-
   toc_item_t ti;
   size_t file_cnt;
 

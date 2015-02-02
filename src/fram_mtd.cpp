@@ -130,10 +130,17 @@ msg_t FramMtd::shred(uint8_t pattern){
  *
  */
 msg_t FramMtd::datamove(size_t blklen, size_t blkoffset, int32_t shift){
-  (void)blklen;
-  (void)blkoffset;
-  (void)shift;
-  osalSysHalt("Unrealized");
-  return MSG_RESET;
+  msg_t status = MSG_RESET;
+
+  osalSysHalt("Unfinished function");
+
+  osalDbgAssert((blklen > 0) && ((blkoffset + blklen) < capacity()), "Not enough space");
+  osalDbgAssert((shift < 0) && ((blkoffset + shift) <= 0), "Underflow");
+  osalDbgAssert((shift > 0) && ((shift + blkoffset) < capacity()), "Overflow");
+
+  if (0 == shift)
+    return MSG_OK; /* nothing to do */
+
+  return status;
 }
 
