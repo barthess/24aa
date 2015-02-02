@@ -25,8 +25,13 @@
 #include "mtd.hpp"
 #include "nvram_file.hpp"
 
-#define MAX_FILE_NAME_LEN     8
-#define MAX_FILE_CNT          3
+#if !defined(NVRAM_FS_MAX_FILE_NAME_LEN)
+#define NVRAM_FS_MAX_FILE_NAME_LEN        8
+#endif
+
+#if !defined(NVRAM_FS_MAX_FILE_CNT)
+#define NVRAM_FS_MAX_FILE_CNT             3
+#endif
 
 /**
  *
@@ -35,7 +40,7 @@ typedef struct {
   /**
    * NULL terminated string representing human readable name.
    */
-  char name[MAX_FILE_NAME_LEN];
+  char name[NVRAM_FS_MAX_FILE_NAME_LEN];
   /**
    * Start of file
    */
@@ -75,7 +80,7 @@ private:
   int find(const char *name, toc_item_t *ti);
   Mtd &mtd;
   NvramFile super;
-  NvramFile fat[MAX_FILE_CNT];
+  NvramFile fat[NVRAM_FS_MAX_FILE_CNT];
   /* counter of opened files. In unmounted state this value must be 0.
    * After mounting it must be set to 1 denoting successful mount. Every
    * 'open' operation must increment it and every 'close' must decrement it. */

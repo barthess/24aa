@@ -66,7 +66,7 @@ void NvramFs::open_super(void) {
   super.mtd = &mtd;
   super.tip = 0;
   super.start = 0;
-  super.size = FAT_OFFSET + sizeof(toc_item_t) * MAX_FILE_CNT + 1; /* 1 is seal byte */
+  super.size = FAT_OFFSET + sizeof(toc_item_t) * NVRAM_FS_MAX_FILE_CNT + 1; /* 1 is seal byte */
 }
 
 /**
@@ -126,7 +126,7 @@ bool NvramFs::mkfs(void) {
 
   /* write empty FAT */
   memset(buf, 0, sizeof(buf));
-  for (size_t i=0; i<MAX_FILE_CNT; i++){
+  for (size_t i=0; i<NVRAM_FS_MAX_FILE_CNT; i++){
     written = super.write(buf, sizeof(buf));
     checksum ^= xorbuf(buf, sizeof(buf));
     if (sizeof(buf) != written){
@@ -167,7 +167,7 @@ uint8_t NvramFs::get_checksum(void){
   uint8_t buf[1];
   size_t status;
 
-  status = super.setPosition(FAT_OFFSET + sizeof(toc_item_t) * MAX_FILE_CNT);
+  status = super.setPosition(FAT_OFFSET + sizeof(toc_item_t) * NVRAM_FS_MAX_FILE_CNT);
   osalDbgCheck(FILE_OK == status);
 
   status = super.read(buf, 1);
@@ -190,7 +190,7 @@ void NvramFs::seal(void){
   checksum ^= get_file_cnt();
 
   super.setPosition(FAT_OFFSET);
-  for (size_t i=0; i<MAX_FILE_CNT; i++){
+  for (size_t i=0; i<NVRAM_FS_MAX_FILE_CNT; i++){
     uint32_t status = super.read(buf, sizeof(buf));
     osalDbgCheck(sizeof(buf) == status);
     checksum ^= xorbuf(buf, sizeof(buf));
@@ -237,7 +237,7 @@ void NvramFs::get_toc_item(toc_item_t *result, size_t num){
   size_t status;
   const size_t blocklen = sizeof(toc_item_t);
 
-  osalDbgCheck(num < MAX_FILE_CNT);
+  osalDbgCheck(num < NVRAM_FS_MAX_FILE_CNT);
 
   status = super.setPosition(FAT_OFFSET + num * blocklen);
   osalDbgCheck(FILE_OK == status);
@@ -253,7 +253,7 @@ void NvramFs::write_toc_item(const toc_item_t *ti, uint8_t num){
   size_t status;
   const size_t blocklen = sizeof(toc_item_t);
 
-  osalDbgCheck(num < MAX_FILE_CNT);
+  osalDbgCheck(num < NVRAM_FS_MAX_FILE_CNT);
 
   status = super.setPosition(FAT_OFFSET + num * blocklen);
   osalDbgCheck(FILE_OK == status);
@@ -284,11 +284,11 @@ bool NvramFs::fsck(void) {
   /* check existing files number */
   exists = get_file_cnt();
   checksum ^= exists;
-  if (exists > MAX_FILE_CNT)
+  if (exists > NVRAM_FS_MAX_FILE_CNT)
     goto FAILED;
 
   /* verify check sum */
-  for (size_t i=0; i<MAX_FILE_CNT; i++){
+  for (size_t i=0; i<NVRAM_FS_MAX_FILE_CNT; i++){
     uint32_t status = super.read(buf, sizeof(buf));
     osalDbgCheck(sizeof(buf) == status);
     checksum ^= xorbuf(buf, sizeof(buf));
@@ -303,7 +303,7 @@ bool NvramFs::fsck(void) {
     toc_item_t ti;
     get_toc_item(&ti, i);
 
-    if (OSAL_FAILED == check_name(ti.name, MAX_FILE_NAME_LEN))
+    if (OSAL_FAILED == check_name(ti.name, NVRAM_FS_MAX_FILE_NAME_LEN))
       goto FAILED;
     if ((ti.start + ti.size) >= mtd.capacity())
       goto FAILED;
@@ -394,7 +394,7 @@ bool NvramFs::umount(void) {
 int NvramFs::find(const char *name, toc_item_t *ti){
   size_t i = 0;
 
-  for (i=0; i<MAX_FILE_CNT; i++){
+  for (i=0; i<NVRAM_FS_MAX_FILE_CNT; i++){
     get_toc_item(ti, i);
     if (0 == strcmp(name, ti->name)){
       return i;
@@ -420,7 +420,7 @@ NvramFile * NvramFs::create(const char *name, chibios_fs::fileoffset_t size){
   file_cnt = get_file_cnt();
 
   /* check are we have spare slot for file */
-  if (MAX_FILE_CNT == file_cnt)
+  if (NVRAM_FS_MAX_FILE_CNT == file_cnt)
     return NULL;
 
   id = find(name, &ti);
@@ -428,11 +428,11 @@ NvramFile * NvramFs::create(const char *name, chibios_fs::fileoffset_t size){
     return NULL; /* such file already exists */
 
   /* check for name length */
-  if (strlen(name) >= MAX_FILE_NAME_LEN)
+  if (strlen(name) >= NVRAM_FS_MAX_FILE_NAME_LEN)
     return NULL;
 
   /* there is no such file. Lets create it*/
-  strncpy(ti.name, name, MAX_FILE_NAME_LEN);
+  strncpy(ti.name, name, NVRAM_FS_MAX_FILE_NAME_LEN);
   ti.size = size;
   if (0 != file_cnt){
     toc_item_t tiprev;
