@@ -165,9 +165,9 @@ size_t Mtd::write_impl(const uint8_t *data, size_t len, size_t offset){
   mtd_led_on();
   this->acquire();
 
-  split_addr(writebuf, offset);             /* store address bytes */
-  memcpy(&(writebuf[2]), data, len);        /* store data bytes */
-  status = busTransmit(writebuf, len+2);
+  split_addr(writebuf, offset);                         /* store address bytes */
+  memcpy(&(writebuf[NVRAM_ADDRESS_BYTES]), data, len);  /* store data bytes */
+  status = busTransmit(writebuf, len+NVRAM_ADDRESS_BYTES);
 
   wait_for_sync();
   this->release();
@@ -210,13 +210,14 @@ msg_t Mtd::shred_impl(uint8_t pattern){
 msg_t Mtd::busReceive(uint8_t *data, size_t len){
 
   msg_t status = MSG_RESET;
-  systime_t tmo = calc_timeout(2, len);
+  systime_t tmo = calc_timeout(NVRAM_ADDRESS_BYTES, len);
 
 #if I2C_USE_MUTUAL_EXCLUSION
   i2cAcquireBus(cfg->i2cp);
 #endif
 
-  status = i2cMasterTransmitTimeout(cfg->i2cp, cfg->addr, writebuf, 2, data, len, tmo);
+  status = i2cMasterTransmitTimeout(cfg->i2cp, cfg->addr, writebuf,
+                                    NVRAM_ADDRESS_BYTES, data, len, tmo);
   if (MSG_OK != status)
     i2cflags = i2cGetErrors(cfg->i2cp);
 
@@ -233,7 +234,7 @@ msg_t Mtd::busReceive(uint8_t *data, size_t len){
 msg_t Mtd::busTransmit(const uint8_t *data, size_t len){
 
   msg_t status = MSG_RESET;
-  systime_t tmo = calc_timeout(len + 2, 0);
+  systime_t tmo = calc_timeout(len + NVRAM_ADDRESS_BYTES, 0);
 
 #if I2C_USE_MUTUAL_EXCLUSION
   i2cAcquireBus(cfg->i2cp);
