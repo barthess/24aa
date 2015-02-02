@@ -49,6 +49,8 @@ expected.
 
 #include "eeprom_mtd.hpp"
 
+namespace nvram {
+
 /*
  ******************************************************************************
  * DEFINES
@@ -84,7 +86,7 @@ expected.
  *
  */
 void EepromMtd::wait_for_sync(void){
-  chThdSleep(eeprom_cfg->writetime);
+  osalThreadSleep(eeprom_cfg->writetime);
 }
 
 /**
@@ -210,9 +212,4 @@ msg_t EepromMtd::datamove(size_t blklen, size_t blkoffset, int32_t shift){
   return status;
 }
 
-
-
-
-
-
-
+} /* namespace */

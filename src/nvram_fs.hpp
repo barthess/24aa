@@ -33,6 +33,8 @@
 #define NVRAM_FS_MAX_FILE_CNT             3
 #endif
 
+namespace nvram {
+
 /**
  *
  */
@@ -54,12 +56,12 @@ typedef struct {
 /**
  *
  */
-class NvramFs {
+class Fs {
 public:
-  NvramFs(Mtd &mtd);
-  NvramFile *open(const char *name);
-  void close(NvramFile *f);
-  NvramFile *create(const char *name, chibios_fs::fileoffset_t size);
+  Fs(Mtd &mtd);
+  File *open(const char *name);
+  void close(File *f);
+  File *create(const char *name, chibios_fs::fileoffset_t size);
   bool mount(void);
   bool umount(void);
   bool mkfs(void);
@@ -76,15 +78,17 @@ private:
   void open_super(void);
   void seal(void);
   void ulink(int id);
-  void gc(void);
+  void garbage_collect(void);
   int find(const char *name, toc_item_t *ti);
   Mtd &mtd;
-  NvramFile super;
-  NvramFile fat[NVRAM_FS_MAX_FILE_CNT];
+  File super;
+  File fat[NVRAM_FS_MAX_FILE_CNT];
   /* counter of opened files. In unmounted state this value must be 0.
    * After mounting it must be set to 1 denoting successful mount. Every
    * 'open' operation must increment it and every 'close' must decrement it. */
   uint8_t files_opened;
 };
+
+} /* namespace */
 
 #endif /* NVRAM_FS_HPP_ */

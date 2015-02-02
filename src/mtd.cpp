@@ -25,6 +25,8 @@
 
 #include "mtd.hpp"
 
+namespace nvram {
+
 /*
  ******************************************************************************
  * DEFINES
@@ -273,8 +275,4 @@ msg_t Mtd::stm32_f1x_read_byte(uint8_t *buf, size_t absoffset){
   return ret;
 }
 
-
-
-
-
-
+} /* namespace */

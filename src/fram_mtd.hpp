@@ -24,6 +24,8 @@
 
 #include "mtd.hpp"
 
+namespace nvram {
+
 /**
  *
  */
@@ -50,5 +52,7 @@ private:
   void fitted_write(const uint8_t *data, size_t len, size_t offset, uint32_t *written);
   const FramConfig *fram_cfg;
 };
+
+} /* namespace */
 
 #endif /* FRAM_MTD_HPP_ */

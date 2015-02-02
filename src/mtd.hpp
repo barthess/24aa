@@ -37,6 +37,8 @@
 #define MTD_WRITE_BUF_SIZE                      (32 + NVRAM_ADDRESS_BYTES)
 #endif
 
+namespace nvram {
+
 /**
  *
  */
@@ -85,5 +87,7 @@ protected:
     #endif
   #endif /* MTD_USE_MUTUAL_EXCLUSION */
 };
+
+} /* namespace */
 
 #endif /* MTD_HPP_ */

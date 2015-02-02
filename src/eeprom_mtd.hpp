@@ -24,6 +24,8 @@
 
 #include "mtd.hpp"
 
+namespace nvram {
+
 /**
  *
  */
@@ -60,5 +62,7 @@ private:
   size_t fitted_write(const uint8_t *data, size_t len, size_t offset);
   const EepromConfig *eeprom_cfg;
 };
+
+} /* namespace */
 
 #endif /* EEPROM_MTD_HPP_ */

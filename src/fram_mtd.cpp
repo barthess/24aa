@@ -23,6 +23,8 @@
 
 #include "fram_mtd.hpp"
 
+namespace nvram {
+
 /*
  ******************************************************************************
  * DEFINES
@@ -144,3 +146,4 @@ msg_t FramMtd::datamove(size_t blklen, size_t blkoffset, int32_t shift){
   return status;
 }
 
+} /* namespace */

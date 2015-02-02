@@ -25,10 +25,15 @@
 #include "fs.hpp"
 #include "mtd.hpp"
 
-class NvramFile : public chibios_fs::BaseFileStreamInterface{
-  friend class NvramFs;
+namespace nvram {
+
+/**
+ *
+ */
+class File : public chibios_fs::BaseFileStreamInterface{
+  friend class Fs;
 public:
-  NvramFile(void);
+  File(void);
   void __test_ctor(Mtd *mtd, chibios_fs::fileoffset_t start, chibios_fs::fileoffset_t size);
   uint32_t getAndClearLastError(void);
   chibios_fs::fileoffset_t getSize(void);
@@ -55,5 +60,7 @@ private:
   uint16_t size;  /* size (bytes) */
   uint16_t tip;   /* current position in file (bytes) */
 };
+
+} /* namespace */
 
 #endif /* NVRAM_FILE_HPP_ */

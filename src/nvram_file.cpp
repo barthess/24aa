@@ -25,6 +25,7 @@
 #include "nvram_file.hpp"
 
 using namespace chibios_fs;
+namespace nvram {
 
 /*
  ******************************************************************************
@@ -60,7 +61,7 @@ using namespace chibios_fs;
 /**
  *
  */
-msg_t NvramFile::put(uint8_t b){
+msg_t File::put(uint8_t b){
   (void)b;
   osalSysHalt("Unrealized");
   return 0;
@@ -69,7 +70,7 @@ msg_t NvramFile::put(uint8_t b){
 /**
  *
  */
-msg_t NvramFile::get(void){
+msg_t File::get(void){
   osalSysHalt("Unrealized");
   return 0;
 }
@@ -77,7 +78,7 @@ msg_t NvramFile::get(void){
 /**
  *
  */
-uint32_t NvramFile::getAndClearLastError(void){
+uint32_t File::getAndClearLastError(void){
   osalSysHalt("Unrealized");
   return 0;
 }
@@ -90,14 +91,14 @@ uint32_t NvramFile::getAndClearLastError(void){
 /**
  *
  */
-NvramFile::NvramFile(void) {
+File::File(void) {
   return;
 }
 
 /**
  * @brief     Special constructor for testing. Do not use it.
  */
-void NvramFile::__test_ctor(Mtd *mtd, fileoffset_t start, fileoffset_t size){
+void File::__test_ctor(Mtd *mtd, fileoffset_t start, fileoffset_t size){
   this->mtd = mtd;
   this->tip = 0;
   this->start = start;
@@ -107,7 +108,7 @@ void NvramFile::__test_ctor(Mtd *mtd, fileoffset_t start, fileoffset_t size){
 /**
  *
  */
-size_t NvramFile::clamp_size(size_t n){
+size_t File::clamp_size(size_t n){
   size_t p = getPosition();
   size_t s = getSize();
   if ((p + n) > s)
@@ -119,7 +120,7 @@ size_t NvramFile::clamp_size(size_t n){
 /**
  *
  */
-void NvramFile::close(void){
+void File::close(void){
   this->mtd = NULL;
   this->tip = 0;
   this->start = 0;
@@ -129,7 +130,7 @@ void NvramFile::close(void){
 /**
  *
  */
-fileoffset_t NvramFile::getSize(void){
+fileoffset_t File::getSize(void){
   osalDbgAssert(NULL != this->mtd, "File not opened");
   return size;
 }
@@ -137,7 +138,7 @@ fileoffset_t NvramFile::getSize(void){
 /**
  *
  */
-fileoffset_t NvramFile::getPosition(void){
+fileoffset_t File::getPosition(void){
   osalDbgAssert(NULL != this->mtd, "File not opened");
   return tip;
 }
@@ -145,7 +146,7 @@ fileoffset_t NvramFile::getPosition(void){
 /**
  *
  */
-uint32_t NvramFile::setPosition(fileoffset_t offset){
+uint32_t File::setPosition(fileoffset_t offset){
   osalDbgAssert(NULL != this->mtd, "File not opened");
 
   uint32_t size = getSize();
@@ -160,7 +161,7 @@ uint32_t NvramFile::setPosition(fileoffset_t offset){
 /**
  *
  */
-size_t NvramFile::read(uint8_t *buf, size_t n){
+size_t File::read(uint8_t *buf, size_t n){
 
   osalDbgAssert(NULL != this->mtd, "File not opened");
   osalDbgCheck(NULL != buf);
@@ -180,7 +181,7 @@ size_t NvramFile::read(uint8_t *buf, size_t n){
 /**
  *
  */
-size_t NvramFile::write(const uint8_t *buf, size_t n){
+size_t File::write(const uint8_t *buf, size_t n){
 
   osalDbgAssert(NULL != this->mtd, "File not opened");
   osalDbgCheck(NULL != buf);
@@ -200,7 +201,7 @@ size_t NvramFile::write(const uint8_t *buf, size_t n){
 /**
  *
  */
-uint64_t NvramFile::getU64(void){
+uint64_t File::getU64(void){
   uint64_t ret;
   read((uint8_t *)&ret, sizeof(ret));
   return ret;
@@ -209,7 +210,7 @@ uint64_t NvramFile::getU64(void){
 /**
  *
  */
-uint32_t NvramFile::getU32(void){
+uint32_t File::getU32(void){
   uint32_t ret;
   read((uint8_t *)&ret, sizeof(ret));
   return ret;
@@ -218,7 +219,7 @@ uint32_t NvramFile::getU32(void){
 /**
  *
  */
-uint16_t NvramFile::getU16(void){
+uint16_t File::getU16(void){
   uint16_t ret;
   read((uint8_t *)&ret, sizeof(ret));
   return ret;
@@ -227,20 +228,22 @@ uint16_t NvramFile::getU16(void){
 /**
  *
  */
-size_t NvramFile::putU64(uint64_t data){
+size_t File::putU64(uint64_t data){
   return write((uint8_t *)&data, sizeof(data));
 }
 
 /**
  *
  */
-size_t NvramFile::putU32(uint32_t data){
+size_t File::putU32(uint32_t data){
   return write((uint8_t *)&data, sizeof(data));
 }
 
 /**
  *
  */
-size_t NvramFile::putU16(uint16_t data){
+size_t File::putU16(uint16_t data){
   return write((uint8_t *)&data, sizeof(data));
 }
+
+} /* namespace */

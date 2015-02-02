@@ -25,6 +25,7 @@
 #include "nvram_fs.hpp"
 
 using namespace chibios_fs;
+namespace nvram {
 
 /*
  ******************************************************************************
@@ -62,7 +63,7 @@ static const fileoffset_t FAT_OFFSET = sizeof(magic) + 1;  /* 1 is for storing f
 /**
  *
  */
-void NvramFs::open_super(void) {
+void Fs::open_super(void) {
   super.mtd = &mtd;
   super.tip = 0;
   super.start = 0;
@@ -108,7 +109,7 @@ static bool check_name(const char *buf, size_t len) {
 /**
  *
  */
-bool NvramFs::mkfs(void) {
+bool Fs::mkfs(void) {
   uint8_t buf[sizeof(toc_item_t)];
   uint8_t checksum = xorbuf(magic, sizeof(magic));
   size_t written;
@@ -150,7 +151,7 @@ FAILED:
 /**
  *
  */
-void NvramFs::get_magic(uint8_t *result){
+void Fs::get_magic(uint8_t *result){
   size_t status;
 
   status = super.setPosition(0);
@@ -163,7 +164,7 @@ void NvramFs::get_magic(uint8_t *result){
 /**
  *
  */
-uint8_t NvramFs::get_checksum(void){
+uint8_t Fs::get_checksum(void){
   uint8_t buf[1];
   size_t status;
 
@@ -179,7 +180,7 @@ uint8_t NvramFs::get_checksum(void){
 /**
  * @brief   Recalculate and write checksum
  */
-void NvramFs::seal(void){
+void Fs::seal(void){
   uint8_t buf[sizeof(toc_item_t)];
   uint8_t checksum;
 
@@ -204,7 +205,7 @@ void NvramFs::seal(void){
 /**
  *
  */
-uint8_t NvramFs::get_file_cnt(void){
+uint8_t Fs::get_file_cnt(void){
   uint8_t buf[1];
   size_t status;
 
@@ -220,7 +221,7 @@ uint8_t NvramFs::get_file_cnt(void){
 /**
  *
  */
-void NvramFs::write_file_cnt(uint8_t cnt){
+void Fs::write_file_cnt(uint8_t cnt){
   size_t status;
 
   status = super.setPosition(sizeof(magic));
@@ -233,7 +234,7 @@ void NvramFs::write_file_cnt(uint8_t cnt){
 /**
  *
  */
-void NvramFs::get_toc_item(toc_item_t *result, size_t num){
+void Fs::get_toc_item(toc_item_t *result, size_t num){
   size_t status;
   const size_t blocklen = sizeof(toc_item_t);
 
@@ -249,7 +250,7 @@ void NvramFs::get_toc_item(toc_item_t *result, size_t num){
 /**
  *
  */
-void NvramFs::write_toc_item(const toc_item_t *ti, uint8_t num){
+void Fs::write_toc_item(const toc_item_t *ti, uint8_t num){
   size_t status;
   const size_t blocklen = sizeof(toc_item_t);
 
@@ -266,7 +267,7 @@ void NvramFs::write_toc_item(const toc_item_t *ti, uint8_t num){
 /**
  *
  */
-bool NvramFs::fsck(void) {
+bool Fs::fsck(void) {
   fileoffset_t first_empty_byte;
   uint8_t buf[sizeof(toc_item_t)];
   uint8_t checksum = xorbuf(magic, sizeof(magic));
@@ -322,7 +323,7 @@ FAILED:
 /**
  * @brief   Delete reference to file from superblock
  */
-void NvramFs::ulink(int id){
+void Fs::ulink(int id){
   (void)id;
   osalSysHalt("Unrealized");
 }
@@ -330,7 +331,7 @@ void NvramFs::ulink(int id){
 /**
  * @brief   Consolidate free space after file deletion
  */
-void NvramFs::gc(void){
+void Fs::garbage_collect(void){
   osalSysHalt("Unrealized");
   mtd.datamove(0,0,0);
 }
@@ -343,7 +344,7 @@ void NvramFs::gc(void){
 /**
  *
  */
-NvramFs::NvramFs(Mtd &mtd) :
+Fs::Fs(Mtd &mtd) :
 mtd(mtd),
 files_opened(0)
 {
@@ -353,7 +354,7 @@ files_opened(0)
 /**
  *
  */
-bool NvramFs::mount(void) {
+bool Fs::mount(void) {
 
   /* already mounted */
   if (this->files_opened > 1)
@@ -376,7 +377,7 @@ FAILED:
 /**
  *
  */
-bool NvramFs::umount(void) {
+bool Fs::umount(void) {
 
   /* FS has some opened files */
   if (this->files_opened > 1)
@@ -391,7 +392,7 @@ bool NvramFs::umount(void) {
 /**
  *
  */
-int NvramFs::find(const char *name, toc_item_t *ti){
+int Fs::find(const char *name, toc_item_t *ti){
   size_t i = 0;
 
   for (i=0; i<NVRAM_FS_MAX_FILE_CNT; i++){
@@ -406,7 +407,7 @@ int NvramFs::find(const char *name, toc_item_t *ti){
 /**
  *
  */
-NvramFile * NvramFs::create(const char *name, chibios_fs::fileoffset_t size){
+File * Fs::create(const char *name, chibios_fs::fileoffset_t size){
   toc_item_t ti;
   int id = -1;
   size_t file_cnt;
@@ -454,7 +455,7 @@ NvramFile * NvramFs::create(const char *name, chibios_fs::fileoffset_t size){
 /**
  *
  */
-NvramFile * NvramFs::open(const char *name){
+File * Fs::open(const char *name){
   toc_item_t ti;
   int id = -1;
 
@@ -479,7 +480,7 @@ NvramFile * NvramFs::open(const char *name){
 /**
  *
  */
-void NvramFs::close(NvramFile *f) {
+void Fs::close(File *f) {
 
   osalDbgAssert(this->files_opened > 0, "FS not mounted");
 
@@ -490,7 +491,7 @@ void NvramFs::close(NvramFile *f) {
 /**
  * @brief   Return free disk space
  */
-fileoffset_t NvramFs::df(void){
+fileoffset_t Fs::df(void){
   toc_item_t ti;
   size_t file_cnt;
 
@@ -509,7 +510,7 @@ fileoffset_t NvramFs::df(void){
 /**
  *
  */
-bool NvramFs::rm(const char *name){
+bool Fs::rm(const char *name){
   toc_item_t ti;
   int id = -1;
 
@@ -525,7 +526,8 @@ bool NvramFs::rm(const char *name){
 
   osalSysHalt("Functionality unrealized yet");
   ulink(id);
-  gc();
+  garbage_collect();
   return OSAL_SUCCESS;
 }
 
+} /* namespace */
