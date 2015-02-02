@@ -336,6 +336,7 @@ void NvramFs::ulink(int id){
  */
 void NvramFs::gc(void){
   osalSysHalt("Unrealized");
+  mtd.datamove(0,0,0);
 }
 
 /*
