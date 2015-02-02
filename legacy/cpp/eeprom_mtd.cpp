@@ -138,7 +138,7 @@ msg_t EepromMtd::read(uint8_t *data, size_t absoffset, size_t len){
  */
 msg_t EepromMtd::write(const uint8_t *data, size_t absoffset, size_t len){
 
-  eeprom_led_on();
+  mtd_led_on();
 
   msg_t status = RDY_RESET;
   systime_t tmo = calc_timeout(cfg->i2cp, (len + 2), 0);
@@ -170,7 +170,7 @@ msg_t EepromMtd::write(const uint8_t *data, size_t absoffset, size_t len){
 
   /* wait until EEPROM process data */
   chThdSleep(cfg->writetime);
-  eeprom_led_off();
+  mtd_led_off();
 
   this->release();
 

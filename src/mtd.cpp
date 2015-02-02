@@ -162,7 +162,7 @@ size_t Mtd::write_impl(const uint8_t *data, size_t len, size_t offset){
 
   osalDbgCheck((sizeof(writebuf) - NVRAM_ADDRESS_BYTES) >= len);
 
-  eeprom_led_on();
+  mtd_led_on();
   this->acquire();
 
   split_addr(writebuf, offset);             /* store address bytes */
@@ -171,7 +171,7 @@ size_t Mtd::write_impl(const uint8_t *data, size_t len, size_t offset){
 
   wait_for_sync();
   this->release();
-  eeprom_led_off();
+  mtd_led_off();
 
   if (status == MSG_OK)
     return len;
@@ -185,7 +185,7 @@ size_t Mtd::write_impl(const uint8_t *data, size_t len, size_t offset){
 msg_t Mtd::shred_impl(uint8_t pattern){
   msg_t status = MSG_RESET;
 
-  eeprom_led_on();
+  mtd_led_on();
   this->acquire();
 
   size_t blocksize = (sizeof(writebuf) - NVRAM_ADDRESS_BYTES);
@@ -200,7 +200,7 @@ msg_t Mtd::shred_impl(uint8_t pattern){
   }
 
   this->release();
-  eeprom_led_off();
+  mtd_led_off();
   return MSG_OK;
 }
 
