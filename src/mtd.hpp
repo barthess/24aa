@@ -40,9 +40,9 @@
 #error "Buffer size must be defined in mtd_conf.h"
 #endif
 
-//#if !defined(NVRAM_FS_USE_DELETE_AND_RESIZE)
-//#define NVRAM_FS_USE_DELETE_AND_RESIZE          FALSE
-//#endif
+#if !defined(NVRAM_FS_USE_DELETE_AND_RESIZE)
+#define NVRAM_FS_USE_DELETE_AND_RESIZE          FALSE
+#endif
 
 namespace nvram {
 
@@ -67,13 +67,15 @@ class Mtd {
 public:
   Mtd(const MtdConfig *cfg);
   msg_t read(uint8_t *data, size_t len, size_t offset);
-  msg_t move(size_t blklen, size_t blkoffset, int32_t shift);
+#if NVRAM_FS_USE_DELETE_AND_RESIZE
+  msg_t move(size_t len, size_t blkstart, int shift);
+#endif
   virtual msg_t write(const uint8_t *data, size_t len, size_t offset) = 0;
   virtual msg_t shred(uint8_t pattern) = 0;
   virtual size_t capacity(void) = 0;
 private:
-  msg_t move_right(size_t blklen, size_t blkoffset, size_t shift);
-  msg_t move_left(size_t blklen, size_t blkoffset, size_t shift);
+  msg_t move_right(size_t len, size_t blkstart, size_t shift);
+  msg_t move_left(size_t len, size_t blkstart, size_t shift);
 protected:
   msg_t shred_impl(uint8_t pattern);
   size_t write_impl(const uint8_t *data, size_t len, size_t offset);

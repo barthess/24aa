@@ -67,18 +67,23 @@ public:
   bool mkfs(void);
   bool fsck(void);
   chibios_fs::fileoffset_t df(void);
+#if NVRAM_FS_USE_DELETE_AND_RESIZE
   bool rm(const char *name);
+  bool resize(const char *name, size_t newsize);
+#endif
 private:
   uint8_t get_checksum(void);
   uint8_t get_file_cnt(void);
   void write_file_cnt(uint8_t cnt);
   void get_magic(uint8_t *result);
-  void get_toc_item(toc_item_t *result, size_t num);
+  void read_toc_item(toc_item_t *result, size_t num);
   void write_toc_item(const toc_item_t *result, uint8_t num);
   void open_super(void);
   void seal(void);
+#if NVRAM_FS_USE_DELETE_AND_RESIZE
   void ulink(int id);
   void garbage_collect(void);
+#endif
   int find(const char *name, toc_item_t *ti);
   Mtd &mtd;
   File super;

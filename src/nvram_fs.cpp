@@ -221,26 +221,26 @@ uint8_t Fs::get_file_cnt(void){
 /**
  *
  */
-void Fs::write_file_cnt(uint8_t cnt){
+void Fs::write_file_cnt(uint8_t N){
   size_t status;
 
   status = super.setPosition(sizeof(magic));
   osalDbgCheck(FILE_OK == status);
 
-  status = super.write(&cnt, 1);
+  status = super.write(&N, 1);
   osalDbgCheck(1 == status);
 }
 
 /**
  *
  */
-void Fs::get_toc_item(toc_item_t *result, size_t num){
+void Fs::read_toc_item(toc_item_t *result, size_t N){
   size_t status;
   const size_t blocklen = sizeof(toc_item_t);
 
-  osalDbgCheck(num < NVRAM_FS_MAX_FILE_CNT);
+  osalDbgCheck(N < NVRAM_FS_MAX_FILE_CNT);
 
-  status = super.setPosition(FAT_OFFSET + num * blocklen);
+  status = super.setPosition(FAT_OFFSET + N * blocklen);
   osalDbgCheck(FILE_OK == status);
 
   status = super.read((uint8_t *)result, blocklen);
@@ -250,18 +250,18 @@ void Fs::get_toc_item(toc_item_t *result, size_t num){
 /**
  *
  */
-void Fs::write_toc_item(const toc_item_t *ti, uint8_t num){
+void Fs::write_toc_item(const toc_item_t *ti, uint8_t N){
   size_t status;
   const size_t blocklen = sizeof(toc_item_t);
 
-  osalDbgCheck(num < NVRAM_FS_MAX_FILE_CNT);
+  osalDbgCheck(N < NVRAM_FS_MAX_FILE_CNT);
 
-  status = super.setPosition(FAT_OFFSET + num * blocklen);
+  status = super.setPosition(FAT_OFFSET + N * blocklen);
   osalDbgCheck(FILE_OK == status);
   status = super.write((uint8_t *)ti, blocklen);
   osalDbgCheck(blocklen == status);
 
-  write_file_cnt(num + 1);
+  write_file_cnt(N + 1);
 }
 
 /**
@@ -302,7 +302,7 @@ bool Fs::fsck(void) {
   super.setPosition(FAT_OFFSET);
   for (size_t i=0; i<exists; i++){
     toc_item_t ti;
-    get_toc_item(&ti, i);
+    read_toc_item(&ti, i);
 
     if (OSAL_FAILED == check_name(ti.name, NVRAM_FS_MAX_FILE_NAME_LEN))
       goto FAILED;
@@ -320,6 +320,8 @@ FAILED:
   return OSAL_FAILED;
 }
 
+#if NVRAM_FS_USE_DELETE_AND_RESIZE
+
 /**
  * @brief   Delete reference to file from superblock
  */
@@ -335,6 +337,8 @@ void Fs::garbage_collect(void){
   osalSysHalt("Unrealized");
   mtd.move(0,0,0);
 }
+
+#endif /* NVRAM_FS_USE_DELETE_AND_RESIZE */
 
 /*
  ******************************************************************************
@@ -396,7 +400,7 @@ int Fs::find(const char *name, toc_item_t *ti){
   size_t i = 0;
 
   for (i=0; i<NVRAM_FS_MAX_FILE_CNT; i++){
-    get_toc_item(ti, i);
+    read_toc_item(ti, i);
     if (0 == strcmp(name, ti->name)){
       return i;
     }
@@ -437,7 +441,7 @@ File * Fs::create(const char *name, chibios_fs::fileoffset_t size){
   ti.size = size;
   if (0 != file_cnt){
     toc_item_t tiprev;
-    get_toc_item(&tiprev, file_cnt - 1);
+    read_toc_item(&tiprev, file_cnt - 1);
     ti.start = tiprev.start + tiprev.size;
   }
   else
@@ -499,13 +503,15 @@ fileoffset_t Fs::df(void){
 
   file_cnt = get_file_cnt();
   if (file_cnt > 0){
-    get_toc_item(&ti, file_cnt - 1);
+    read_toc_item(&ti, file_cnt - 1);
     return mtd.capacity() - (ti.size + ti.start);
   }
   else{
     return mtd.capacity() - (super.size + super.start);
   }
 }
+
+#if NVRAM_FS_USE_DELETE_AND_RESIZE
 
 /**
  *
@@ -529,5 +535,29 @@ bool Fs::rm(const char *name){
   garbage_collect();
   return OSAL_SUCCESS;
 }
+
+/**
+ *
+ */
+bool Fs::resize(const char *name, size_t newsize) {
+  toc_item_t ti;
+  int id = -1;
+
+  osalDbgAssert(this->files_opened > 0, "FS not mounted");
+
+  id = find(name, &ti);
+
+  if (-1 == id)
+    return OSAL_FAILED; /* not found */
+
+  if (&mtd == fat[id].mtd)
+    return OSAL_FAILED; /* file opened */
+
+  osalSysHalt("Functionality unrealized yet");
+  mtd.move(0, 0, newsize);
+  return OSAL_FAILED;
+}
+
+#endif /* NVRAM_FS_USE_DELETE_AND_RESIZE */
 
 } /* namespace */

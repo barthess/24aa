@@ -276,6 +276,8 @@ msg_t Mtd::stm32_f1x_read_byte(uint8_t *buf, size_t absoffset){
   return ret;
 }
 
+#if NVRAM_FS_USE_DELETE_AND_RESIZE
+
 /**
  *
  */
@@ -325,17 +327,17 @@ msg_t Mtd::move_left(size_t blklen, size_t blkoffset, size_t shift) {
 /**
  *
  */
-msg_t Mtd::move_right(size_t blklen, size_t blkoffset, size_t shift) {
+msg_t Mtd::move_right(size_t len, size_t blkstart, size_t shift) {
   const size_t N = 16;
   uint8_t buf[N];
   size_t dst, src, progress, tail;
   msg_t ret;
 
-  osalDbgAssert((blklen + blkoffset + shift) < capacity(), "MTD overflow");
+  osalDbgAssert((len + blkstart + shift) < capacity(), "MTD overflow");
 
   progress = N;
-  while (progress < blklen) {
-    src  = blkoffset + blklen - progress;
+  while (progress < len) {
+    src  = blkstart + len - progress;
     dst = src + shift;
 
     ret = read(buf, src, N);
@@ -350,9 +352,9 @@ msg_t Mtd::move_right(size_t blklen, size_t blkoffset, size_t shift) {
   }
 
   /* process tail (if any) */
-  tail = blklen % N;
+  tail = len % N;
   if (tail > 0) {
-    src  = blkoffset;
+    src  = blkstart;
     dst = src + shift;
 
     ret = read(buf, src, tail);
@@ -370,17 +372,19 @@ msg_t Mtd::move_right(size_t blklen, size_t blkoffset, size_t shift) {
 /**
  * @brief   Move big block of data.
  */
-msg_t Mtd::move(size_t blklen, size_t blkoffset, int32_t shift){
+msg_t Mtd::move(size_t len, size_t blkstart, int shift){
 
-  osalDbgCheck(blklen > 0);
+  osalDbgCheck(len > 0);
 
   if (0 == shift)
     return MSG_OK; /* nothing to do */
 
   if (shift > 0)
-    return move_right(blklen, blkoffset, shift);
+    return move_right(len, blkstart, shift);
   else
-    return move_left(blklen, blkoffset, abs(shift));
+    return move_left(len, blkstart, abs(shift));
 }
+
+#endif /* NVRAM_FS_USE_DELETE_AND_RESIZE */
 
 } /* namespace */
