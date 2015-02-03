@@ -333,7 +333,7 @@ void Fs::ulink(int id){
  */
 void Fs::garbage_collect(void){
   osalSysHalt("Unrealized");
-  mtd.datamove(0,0,0);
+  mtd.move(0,0,0);
 }
 
 /*

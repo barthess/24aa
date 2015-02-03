@@ -19,7 +19,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <string.h>
+#include <cstring>
+#include <cstdlib>
 
 #include "ch.hpp"
 
@@ -157,7 +158,7 @@ msg_t Mtd::read(uint8_t *data, size_t len, size_t offset){
 
 /**
  * @brief   Write data that can be fitted in single page boundary (for EEPROM)
- *          on can be placed in write buffer (for FRAM)
+ *          or can be placed in write buffer (for FRAM)
  */
 size_t Mtd::write_impl(const uint8_t *data, size_t len, size_t offset){
   msg_t status = MSG_RESET;
@@ -273,6 +274,113 @@ msg_t Mtd::stm32_f1x_read_byte(uint8_t *buf, size_t absoffset){
   }
 
   return ret;
+}
+
+/**
+ *
+ */
+msg_t Mtd::move_left(size_t blklen, size_t blkoffset, size_t shift) {
+
+  const size_t N = 16;
+  uint8_t buf[N];
+  size_t dst, src, progress, tail;
+  msg_t ret;
+
+  osalDbgAssert((blkoffset >= shift), "MTD underflow");
+
+  progress = N;
+  while (progress < blklen) {
+    src  = blkoffset + progress - N;
+    dst = src - shift;
+
+    ret = read(buf, src, N);
+    if (MSG_OK != ret)
+      return ret;
+
+    ret = write(buf, dst, N);
+    if (MSG_OK != ret)
+      return ret;
+
+    progress += N;
+  }
+
+  /* process tail (if any) */
+  tail = blklen % N;
+  if (tail > 0) {
+    src  = blkoffset + blklen - tail;
+    dst = src - shift;
+
+    ret = read(buf, src, tail);
+    if (MSG_OK != ret)
+      return ret;
+
+    ret = write(buf, dst, tail);
+    if (MSG_OK != ret)
+      return ret;
+  }
+
+  return MSG_OK;
+}
+
+/**
+ *
+ */
+msg_t Mtd::move_right(size_t blklen, size_t blkoffset, size_t shift) {
+  const size_t N = 16;
+  uint8_t buf[N];
+  size_t dst, src, progress, tail;
+  msg_t ret;
+
+  osalDbgAssert((blklen + blkoffset + shift) < capacity(), "MTD overflow");
+
+  progress = N;
+  while (progress < blklen) {
+    src  = blkoffset + blklen - progress;
+    dst = src + shift;
+
+    ret = read(buf, src, N);
+    if (MSG_OK != ret)
+      return ret;
+
+    ret = write(buf, dst, N);
+    if (MSG_OK != ret)
+      return ret;
+
+    progress += N;
+  }
+
+  /* process tail (if any) */
+  tail = blklen % N;
+  if (tail > 0) {
+    src  = blkoffset;
+    dst = src + shift;
+
+    ret = read(buf, src, tail);
+    if (MSG_OK != ret)
+      return ret;
+
+    ret = write(buf, dst, tail);
+    if (MSG_OK != ret)
+      return ret;
+  }
+
+  return MSG_OK;
+}
+
+/**
+ * @brief   Move big block of data.
+ */
+msg_t Mtd::move(size_t blklen, size_t blkoffset, int32_t shift){
+
+  osalDbgCheck(blklen > 0);
+
+  if (0 == shift)
+    return MSG_OK; /* nothing to do */
+
+  if (shift > 0)
+    return move_right(blklen, blkoffset, shift);
+  else
+    return move_left(blklen, blkoffset, abs(shift));
 }
 
 } /* namespace */
