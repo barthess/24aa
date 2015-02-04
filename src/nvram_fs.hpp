@@ -33,6 +33,10 @@
 #define NVRAM_FS_MAX_FILE_CNT             3
 #endif
 
+#if NVRAM_FS_USE_DELETE_AND_RESIZE
+#warning "Experimental untested feature enabled"
+#endif
+
 namespace nvram {
 
 /**
@@ -81,8 +85,8 @@ private:
   void open_super(void);
   void seal(void);
 #if NVRAM_FS_USE_DELETE_AND_RESIZE
-  void ulink(int id);
-  void garbage_collect(void);
+  void lock(void);
+  void unlock(void);
 #endif
   int find(const char *name, toc_item_t *ti);
   Mtd &mtd;

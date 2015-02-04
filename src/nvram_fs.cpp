@@ -184,7 +184,6 @@ void Fs::seal(void){
   uint8_t buf[sizeof(toc_item_t)];
   uint8_t checksum;
 
-  /* open file */
   osalDbgCheck((this->files_opened > 0) && (NULL != super.mtd));
 
   checksum = xorbuf(magic, sizeof(magic));
@@ -319,26 +318,6 @@ FAILED:
   super.close();
   return OSAL_FAILED;
 }
-
-#if NVRAM_FS_USE_DELETE_AND_RESIZE
-
-/**
- * @brief   Delete reference to file from superblock
- */
-void Fs::ulink(int id){
-  (void)id;
-  osalSysHalt("Unrealized");
-}
-
-/**
- * @brief   Consolidate free space after file deletion
- */
-void Fs::garbage_collect(void){
-  osalSysHalt("Unrealized");
-  mtd.move(0,0,0);
-}
-
-#endif /* NVRAM_FS_USE_DELETE_AND_RESIZE */
 
 /*
  ******************************************************************************
@@ -513,12 +492,21 @@ fileoffset_t Fs::df(void){
 
 #if NVRAM_FS_USE_DELETE_AND_RESIZE
 
+void Fs::lock(void) {
+  ;
+}
+void Fs::unlock(void){
+  ;
+}
+
 /**
  *
  */
 bool Fs::rm(const char *name){
   toc_item_t ti;
   int id = -1;
+  size_t cnt;
+  size_t end_prev;
 
   osalDbgAssert(this->files_opened > 0, "FS not mounted");
 
@@ -530,9 +518,36 @@ bool Fs::rm(const char *name){
   if (&mtd == fat[id].mtd)
     return OSAL_FAILED; /* file opened */
 
-  osalSysHalt("Functionality unrealized yet");
-  ulink(id);
-  garbage_collect();
+  cnt = get_file_cnt();
+
+  this->lock();
+
+  for (size_t i=id; i<(cnt-1); i++){
+    read_toc_item(&ti, i+1);
+    write_toc_item(&ti, i);
+  }
+
+  /* erase last (now unneeded) item */
+  memset(&ti, 0, sizeof(ti));
+  write_toc_item(&ti, cnt-1);
+  write_file_cnt(cnt-1);
+  seal();
+
+  /* compact free space */
+  cnt--;
+  end_prev = super.start + super.size;
+  for (size_t i=0; i<cnt; i++) {
+    read_toc_item(&ti, i);
+    if (ti.start > end_prev) {
+      msg_t result = MSG_RESET;
+      result = mtd.move_left(ti.size, ti.start, ti.start - end_prev);
+      osalDbgCheck(MSG_OK == result);
+      end_prev += ti.size;
+    }
+  }
+
+  this->unlock();
+
   return OSAL_SUCCESS;
 }
 
@@ -543,6 +558,8 @@ bool Fs::resize(const char *name, size_t newsize) {
   toc_item_t ti;
   int id = -1;
 
+  osalSysHalt("Unfinished");
+
   osalDbgAssert(this->files_opened > 0, "FS not mounted");
 
   id = find(name, &ti);
@@ -553,11 +570,16 @@ bool Fs::resize(const char *name, size_t newsize) {
   if (&mtd == fat[id].mtd)
     return OSAL_FAILED; /* file opened */
 
-  osalSysHalt("Functionality unrealized yet");
-  mtd.move(0, 0, newsize);
+  mtd.move_left(0, 0, newsize);
   return OSAL_FAILED;
 }
 
 #endif /* NVRAM_FS_USE_DELETE_AND_RESIZE */
 
 } /* namespace */
+
+
+
+
+
+
