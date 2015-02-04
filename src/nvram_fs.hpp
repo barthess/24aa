@@ -60,6 +60,16 @@ typedef struct {
 /**
  *
  */
+typedef uint8_t filecount_t;
+
+/**
+ *
+ */
+typedef uint8_t checksum_t;
+
+/**
+ *
+ */
 class Fs {
 public:
   Fs(Mtd &mtd);
@@ -95,7 +105,7 @@ private:
   /* counter of opened files. In unmounted state this value must be 0.
    * After mounting it must be set to 1 denoting successful mount. Every
    * 'open' operation must increment it and every 'close' must decrement it. */
-  uint8_t files_opened;
+  filecount_t files_opened;
 };
 
 } /* namespace */
