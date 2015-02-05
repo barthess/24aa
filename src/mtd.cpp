@@ -263,6 +263,8 @@ msg_t Mtd::stm32_f1x_read_byte(uint8_t *buf, size_t absoffset){
   uint8_t tmp[2];
   msg_t ret;
 
+  this->acquire();
+
   /* if NOT last byte of file requested */
   if ((absoffset - 1) < capacity()){
     ret = read(tmp, absoffset, 2);
@@ -272,6 +274,7 @@ msg_t Mtd::stm32_f1x_read_byte(uint8_t *buf, size_t absoffset){
     ret = read(tmp, absoffset - 1, 2);
     buf[0] = tmp[1];
   }
+  this->release();
 
   return ret;
 }
