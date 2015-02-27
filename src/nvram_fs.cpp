@@ -541,7 +541,7 @@ void Fs::close(File *f) {
     return;
   osalDbgAssert(this->files_opened > 0, "FS not mounted");
   /* there is no opened files. return.*/
-  if (this->files_opened == 0)
+  if (this->files_opened <= 1)
     return;
   /* return if the file is already closed.*/
   if (!f->mtd)
