@@ -536,8 +536,16 @@ File * Fs::open(const char *name){
  */
 void Fs::close(File *f) {
 
+  osalDbgAssert(f != NULL, "null pointer reference");
+  if (!f)
+    return;
   osalDbgAssert(this->files_opened > 0, "FS not mounted");
-
+  /* there is no opened files. return.*/
+  if (this->files_opened == 0)
+    return;
+  /* return if the file is already closed.*/
+  if (!f->mtd)
+    return;
   f->close();
   this->files_opened--;
 }
