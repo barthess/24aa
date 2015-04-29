@@ -70,21 +70,32 @@ namespace nvram {
  * @param[in] txbuf pointer to driver transmit buffer
  * @param[in] addr  internal EEPROM device address
  */
-void Mtd::split_addr(uint8_t *txbuf, size_t addr){
-  txbuf[0] = (addr >> 8) & 0xFF;
-  txbuf[1] = addr & 0xFF;
-}
+void Mtd::split_addr(uint8_t *txbuf, uint32_t addr, size_t addr_len) {
+  osalDbgCheck(addr_len <= sizeof(addr));
 
-/**
- * @brief     Calculates requred timeout.
- */
-systime_t Mtd::calc_timeout(size_t txbytes, size_t rxbytes){
-  const uint32_t bitsinbyte = 10;
-  uint32_t tmo;
-  tmo = ((txbytes + rxbytes + 1) * bitsinbyte * 1000);
-  tmo /= EEPROM_I2C_CLOCK;
-  tmo += 10; /* some additional milliseconds to be safer */
-  return MS2ST(tmo);
+  switch (addr_len) {
+  case 1:
+    txbuf[0] = addr & 0xFF;
+    break;
+  case 2:
+    txbuf[0] = (addr >> 8) & 0xFF;
+    txbuf[1] = addr & 0xFF;
+    break;
+  case 3:
+    txbuf[0] = (addr >> 16) & 0xFF;
+    txbuf[1] = (addr >> 8) & 0xFF;
+    txbuf[2] = addr & 0xFF;
+    break;
+  case 4:
+    txbuf[0] = (addr >> 24) & 0xFF;
+    txbuf[1] = (addr >> 16) & 0xFF;
+    txbuf[2] = (addr >> 8) & 0xFF;
+    txbuf[3] = addr & 0xFF;
+    break;
+  default:
+    osalSysHalt("Incorrect address length");
+    break;
+  }
 }
 
 /*
@@ -96,9 +107,8 @@ systime_t Mtd::calc_timeout(size_t txbytes, size_t rxbytes){
 /**
  *
  */
-Mtd::Mtd(const MtdConfig *cfg) :
-cfg(cfg),
-i2cflags(I2C_NO_ERROR)
+Mtd::Mtd(Bus &bus) :
+bus(bus)
 #if (MTD_USE_MUTUAL_EXCLUSION && !CH_CFG_USE_MUTEXES)
   ,semaphore(1)
 #endif
@@ -135,22 +145,15 @@ void Mtd::release(void) {
 /**
  *
  */
-msg_t Mtd::read(uint8_t *data, size_t len, size_t offset){
+msg_t Mtd::read_type24(uint8_t *data, size_t len, size_t offset) {
 
-  msg_t status = MSG_RESET;
-
-#if defined(STM32F1XX_I2C)
-  if (1 == len)
-    return stm32_f1x_read_byte(data, offset);
-#endif /* defined(STM32F1XX_I2C) */
+  msg_t status;
 
   osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
 
   this->acquire();
-  split_addr(writebuf, offset);
-  status = busReceive(data, len);
-  if (MSG_OK != status)
-    i2cflags = i2cGetErrors(cfg->i2cp);
+  split_addr(writebuf, offset, NVRAM_ADDRESS_BYTES);
+  status = bus.exchange(writebuf, NVRAM_ADDRESS_BYTES, data, len);
   this->release();
 
   return status;
@@ -160,17 +163,17 @@ msg_t Mtd::read(uint8_t *data, size_t len, size_t offset){
  * @brief   Write data that can be fitted in single page boundary (for EEPROM)
  *          or can be placed in write buffer (for FRAM)
  */
-size_t Mtd::write_impl(const uint8_t *data, size_t len, size_t offset){
-  msg_t status = MSG_RESET;
+size_t Mtd::write_type24(const uint8_t *data, size_t len, size_t offset) {
+  msg_t status;
 
   osalDbgCheck((sizeof(writebuf) - NVRAM_ADDRESS_BYTES) >= len);
 
   mtd_led_on();
   this->acquire();
 
-  split_addr(writebuf, offset);                         /* store address bytes */
+  split_addr(writebuf, offset, NVRAM_ADDRESS_BYTES);    /* store address bytes */
   memcpy(&(writebuf[NVRAM_ADDRESS_BYTES]), data, len);  /* store data bytes */
-  status = busTransmit(writebuf, len+NVRAM_ADDRESS_BYTES);
+  status = bus.exchange(writebuf, len+NVRAM_ADDRESS_BYTES, nullptr, 0);
 
   wait_for_sync();
   this->release();
@@ -185,8 +188,8 @@ size_t Mtd::write_impl(const uint8_t *data, size_t len, size_t offset){
 /**
  *
  */
-msg_t Mtd::shred_impl(uint8_t pattern){
-  msg_t status = MSG_RESET;
+msg_t Mtd::erase_type24(void) {
+  msg_t status;
 
   mtd_led_on();
   this->acquire();
@@ -194,10 +197,10 @@ msg_t Mtd::shred_impl(uint8_t pattern){
   size_t blocksize = (sizeof(writebuf) - NVRAM_ADDRESS_BYTES);
   size_t total_writes = capacity() / blocksize;
 
-  memset(writebuf, pattern, sizeof(writebuf));
+  memset(writebuf, 0xFF, sizeof(writebuf));
   for (size_t i=0; i<total_writes; i++){
-    split_addr(writebuf, i * blocksize);
-    status = busTransmit(writebuf, sizeof(writebuf));
+    split_addr(writebuf, i * blocksize, NVRAM_ADDRESS_BYTES);
+    status = bus.exchange(writebuf, sizeof(writebuf), nullptr, 0);
     osalDbgCheck(MSG_OK == status);
     wait_for_sync();
   }
@@ -205,78 +208,6 @@ msg_t Mtd::shred_impl(uint8_t pattern){
   this->release();
   mtd_led_off();
   return MSG_OK;
-}
-
-/**
- *
- */
-msg_t Mtd::busReceive(uint8_t *data, size_t len){
-
-  msg_t status = MSG_RESET;
-  systime_t tmo = calc_timeout(NVRAM_ADDRESS_BYTES, len);
-
-#if I2C_USE_MUTUAL_EXCLUSION
-  i2cAcquireBus(cfg->i2cp);
-#endif
-
-  status = i2cMasterTransmitTimeout(cfg->i2cp, cfg->addr, writebuf,
-                                    NVRAM_ADDRESS_BYTES, data, len, tmo);
-  if (MSG_OK != status)
-    i2cflags = i2cGetErrors(cfg->i2cp);
-
-#if I2C_USE_MUTUAL_EXCLUSION
-  i2cReleaseBus(cfg->i2cp);
-#endif
-
-  return status;
-}
-
-/**
- *
- */
-msg_t Mtd::busTransmit(const uint8_t *data, size_t len){
-
-  msg_t status = MSG_RESET;
-  systime_t tmo = calc_timeout(len + NVRAM_ADDRESS_BYTES, 0);
-
-#if I2C_USE_MUTUAL_EXCLUSION
-  i2cAcquireBus(cfg->i2cp);
-#endif
-
-  status = i2cMasterTransmitTimeout(cfg->i2cp, cfg->addr, data, len, NULL, 0, tmo);
-  if (MSG_OK != status)
-    i2cflags = i2cGetErrors(cfg->i2cp);
-
-#if I2C_USE_MUTUAL_EXCLUSION
-  i2cReleaseBus(cfg->i2cp);
-#endif
-
-  return status;
-}
-
-/*
- * Ugly workaround.
- * Stupid I2C cell in STM32F1x does not allow to read single byte.
- * So we must read 2 bytes and return needed one.
- */
-msg_t Mtd::stm32_f1x_read_byte(uint8_t *buf, size_t absoffset){
-  uint8_t tmp[2];
-  msg_t ret;
-
-  this->acquire();
-
-  /* if NOT last byte of file requested */
-  if ((absoffset - 1) < capacity()){
-    ret = read(tmp, absoffset, 2);
-    buf[0] = tmp[0];
-  }
-  else{
-    ret = read(tmp, absoffset - 1, 2);
-    buf[0] = tmp[1];
-  }
-  this->release();
-
-  return ret;
 }
 
 #if NVRAM_FS_USE_DELETE_AND_RESIZE

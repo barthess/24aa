@@ -98,8 +98,8 @@ File::File(void) {
 /**
  * @brief     Special constructor for testing. Do not use it.
  */
-void File::__test_ctor(Mtd *mtd, fileoffset_t start, fileoffset_t size){
-  this->mtd = mtd;
+void File::__test_ctor(BlkDev *blk, fileoffset_t start, fileoffset_t size){
+  this->blk = blk;
   this->tip = 0;
   this->start = start;
   this->size = size;
@@ -121,7 +121,7 @@ size_t File::clamp_size(size_t n){
  *
  */
 void File::close(void){
-  this->mtd = NULL;
+  this->blk = NULL;
   this->tip = 0;
   this->start = 0;
   this->size = 0;
@@ -131,7 +131,7 @@ void File::close(void){
  *
  */
 fileoffset_t File::getSize(void){
-  osalDbgAssert(NULL != this->mtd, "File not opened");
+  osalDbgAssert(NULL != this->blk, "File not opened");
   return size;
 }
 
@@ -139,7 +139,7 @@ fileoffset_t File::getSize(void){
  *
  */
 fileoffset_t File::getPosition(void){
-  osalDbgAssert(NULL != this->mtd, "File not opened");
+  osalDbgAssert(NULL != this->blk, "File not opened");
   return tip;
 }
 
@@ -147,7 +147,7 @@ fileoffset_t File::getPosition(void){
  *
  */
 uint32_t File::setPosition(fileoffset_t offset){
-  osalDbgAssert(NULL != this->mtd, "File not opened");
+  osalDbgAssert(NULL != this->blk, "File not opened");
 
   uint32_t size = getSize();
   if (offset >= size)
@@ -163,14 +163,14 @@ uint32_t File::setPosition(fileoffset_t offset){
  */
 size_t File::read(uint8_t *buf, size_t n){
 
-  osalDbgAssert(NULL != this->mtd, "File not opened");
+  osalDbgAssert(NULL != this->blk, "File not opened");
   osalDbgCheck(NULL != buf);
 
   n = clamp_size(n);
   if (0 == n)
     return 0;
 
-  if (MSG_OK == mtd->read(buf, n, tip + start)){
+  if (MSG_OK == blk->read(buf, n, tip + start)){
     tip += n;
     return n;
   }
@@ -183,14 +183,14 @@ size_t File::read(uint8_t *buf, size_t n){
  */
 size_t File::write(const uint8_t *buf, size_t n){
 
-  osalDbgAssert(NULL != this->mtd, "File not opened");
+  osalDbgAssert(NULL != this->blk, "File not opened");
   osalDbgCheck(NULL != buf);
 
   n = clamp_size(n);
   if (0 == n)
     return 0;
 
-  if (MSG_OK == mtd->write(buf, n, tip + start)){
+  if (MSG_OK == blk->write(buf, n, tip + start)){
     tip += n;
     return n;
   }

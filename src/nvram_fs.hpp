@@ -22,7 +22,7 @@
 #ifndef NVRAM_FS_HPP_
 #define NVRAM_FS_HPP_
 
-#include "mtd.hpp"
+#include "blk_dev.hpp"
 #include "nvram_file.hpp"
 
 #if !defined(NVRAM_FS_MAX_FILE_NAME_LEN)
@@ -74,7 +74,7 @@ class Fs {
 public:
   Fs(Mtd &mtd);
   File *open(const char *name);
-  void close(File *f);
+  void close(File *file);
   File *create(const char *name, chibios_fs::fileoffset_t size);
   bool mount(void);
   bool umount(void);
@@ -99,12 +99,12 @@ private:
   void unlock(void);
 #endif
   int find(const char *name, toc_item_t *ti);
-  Mtd &mtd;
+  BlkDev blk;
   File super;
   File fat[NVRAM_FS_MAX_FILE_CNT];
-  /* counter of opened files. In unmounted state this value must be 0.
+  /* Counter for opened files. In unmounted state this value must be 0.
    * After mounting it must be set to 1 denoting successful mount. Every
-   * 'open' operation must increment it and every 'close' must decrement it. */
+   * 'open' must increment it and every 'close' must decrement it. */
   filecount_t files_opened;
 };
 

@@ -137,7 +137,7 @@ static uint8_t nvramcrc(const uint8_t *buf, size_t len, uint8_t crc) {
  *
  */
 void Fs::open_super(void) {
-  super.mtd = &mtd;
+  super.blk = &blk;
   super.tip = 0;
   super.start = 0;
   super.size = SUPERBLOCK_SIZE;
@@ -177,9 +177,9 @@ bool Fs::mkfs(void) {
   checksum_t sum = 0xFF; /* initial CRC vector */
   size_t written;
 
-  osalDbgCheck((this->files_opened == 0) && (NULL == super.mtd));
+  osalDbgCheck((this->files_opened == 0) && (NULL == super.blk));
   open_super();
-  osalDbgAssert((super.start + super.size) < mtd.capacity(), "Overflow");
+  osalDbgAssert((super.start + super.size) < blk.capacity(), "Overflow");
 
   /* write magic and zero file count */
   memcpy(buf, magic, sizeof(magic));
@@ -249,7 +249,7 @@ void Fs::seal(void){
   uint8_t sum = 0xFF;
   size_t status;
 
-  osalDbgCheck((this->files_opened > 0) && (NULL != super.mtd));
+  osalDbgCheck((this->files_opened > 0) && (NULL != super.blk));
 
   super.setPosition(0);
   status = super.read(buf, FAT_OFFSET);
@@ -339,10 +339,10 @@ bool Fs::fsck(void) {
   filecount_t exists;
   size_t status;
 
-  mtd.read(dbg_super, sizeof(dbg_super), 0);
+  blk.read(dbg_super, sizeof(dbg_super), 0);
 
   /* open superblock */
-  osalDbgCheck((this->files_opened == 0) && (NULL == super.mtd));
+  osalDbgCheck((this->files_opened == 0) && (NULL == super.blk));
   open_super();
 
   /* check magic */
@@ -375,7 +375,7 @@ bool Fs::fsck(void) {
 
     if (OSAL_FAILED == check_name(ti.name, NVRAM_FS_MAX_FILE_NAME_LEN))
       goto FAILED;
-    if ((ti.start + ti.size) >= mtd.capacity())
+    if ((ti.start + ti.size) >= blk.capacity())
       goto FAILED;
     if (ti.start < first_empty_byte)
       goto FAILED;
@@ -398,7 +398,7 @@ FAILED:
  *
  */
 Fs::Fs(Mtd &mtd) :
-mtd(mtd),
+blk(mtd),
 files_opened(0)
 {
   return;
@@ -461,7 +461,7 @@ int Fs::find(const char *name, toc_item_t *ti){
 /**
  *
  */
-File * Fs::create(const char *name, chibios_fs::fileoffset_t size){
+File* Fs::create(const char *name, chibios_fs::fileoffset_t size){
   toc_item_t ti;
   int id = -1;
   size_t file_cnt;
@@ -497,7 +497,7 @@ File * Fs::create(const char *name, chibios_fs::fileoffset_t size){
   else
     ti.start = super.size + super.start;
 
-  if ((ti.size + ti.start) > mtd.capacity())
+  if ((ti.size + ti.start) > blk.capacity())
     return NULL;
 
   /* */
@@ -509,7 +509,7 @@ File * Fs::create(const char *name, chibios_fs::fileoffset_t size){
 /**
  *
  */
-File * Fs::open(const char *name){
+File* Fs::open(const char *name){
   toc_item_t ti;
   int id = -1;
 
@@ -520,12 +520,12 @@ File * Fs::open(const char *name){
   if (-1 == id)
     return NULL; /* not found */
 
-  if (&mtd == fat[id].mtd)
+  if (&blk == fat[id].blk)
     return NULL; /* already opened */
 
   fat[id].size = ti.size;
   fat[id].start = ti.start;
-  fat[id].mtd = &mtd;
+  fat[id].blk = &blk;
   this->files_opened++;
 
   return &fat[id];
@@ -534,19 +534,19 @@ File * Fs::open(const char *name){
 /**
  *
  */
-void Fs::close(File *f) {
+void Fs::close(File *file) {
 
-  osalDbgAssert(f != NULL, "null pointer reference");
-  if (!f)
+  osalDbgAssert(file != NULL, "null pointer reference");
+  if (!file)
     return;
   osalDbgAssert(this->files_opened > 0, "FS not mounted");
   /* there is no opened files. return.*/
   if (this->files_opened <= 1)
     return;
   /* return if the file is already closed.*/
-  if (!f->mtd)
+  if (!file->blk)
     return;
-  f->close();
+  file->close();
   this->files_opened--;
 }
 
@@ -562,10 +562,10 @@ fileoffset_t Fs::df(void){
   file_cnt = get_file_cnt();
   if (file_cnt > 0){
     read_toc_item(&ti, file_cnt - 1);
-    return mtd.capacity() - (ti.size + ti.start);
+    return blk.capacity() - (ti.size + ti.start);
   }
   else{
-    return mtd.capacity() - (super.size + super.start);
+    return blk.capacity() - (super.size + super.start);
   }
 }
 

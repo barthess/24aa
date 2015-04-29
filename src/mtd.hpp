@@ -26,6 +26,7 @@
 #include "hal.h"
 
 #include "mtd_conf.h"
+#include "bus.hpp"
 
 #define NVRAM_ADDRESS_BYTES                     2
 
@@ -53,44 +54,22 @@ namespace nvram {
 /**
  *
  */
-typedef struct {
-  /**
-   * Driver connected to NVRAM IC.
-   */
-  I2CDriver     *i2cp;
-  /**
-   * Address of NVRAM IC on I2C bus.
-   */
-  i2caddr_t     addr;
-}MtdConfig;
-
-/**
- *
- */
 class Mtd {
 public:
-  Mtd(const MtdConfig *cfg);
-  msg_t read(uint8_t *data, size_t len, size_t offset);
-#if NVRAM_FS_USE_DELETE_AND_RESIZE
-  msg_t move_right(size_t len, size_t blkstart, size_t shift);
-  msg_t move_left(size_t len, size_t blkstart, size_t shift);
-#endif
+  Mtd(Bus &bus);
+  virtual msg_t read(uint8_t *data, size_t len, size_t offset) = 0;
   virtual msg_t write(const uint8_t *data, size_t len, size_t offset) = 0;
-  virtual msg_t shred(uint8_t pattern) = 0;
-  virtual size_t capacity(void) = 0;
+  virtual msg_t erase(void) = 0;
+  virtual uint32_t capacity(void) = 0;
+  virtual uint32_t pagesize(void) = 0;
 protected:
-  msg_t shred_impl(uint8_t pattern);
-  size_t write_impl(const uint8_t *data, size_t len, size_t offset);
+  msg_t erase_type24(void);
+  size_t write_type24(const uint8_t *data, size_t len, size_t offset);
+  msg_t read_type24(uint8_t *data, size_t len, size_t offset);
   virtual void wait_for_sync(void) = 0;
-  msg_t busTransmit(const uint8_t *txbuf, size_t txbytes);
-  msg_t busReceive(uint8_t *rxbuf, size_t rxbytes);
-  msg_t stm32_f1x_read_byte(uint8_t *data, size_t offset);
-  void split_addr(uint8_t *txbuf, size_t addr);
-  systime_t calc_timeout(size_t txbytes, size_t rxbytes);
+  void split_addr(uint8_t *txbuf, uint32_t addr, size_t addr_len);
   void acquire(void);
   void release(void);
-  const MtdConfig *cfg;
-  i2cflags_t i2cflags;
   #if MTD_USE_MUTUAL_EXCLUSION
     #if CH_CFG_USE_MUTEXES
       chibios_rt::Mutex             mutex;
@@ -99,6 +78,7 @@ protected:
     #endif
   #endif /* MTD_USE_MUTUAL_EXCLUSION */
   uint8_t writebuf[MTD_WRITE_BUF_SIZE];
+  Bus &bus;
 };
 
 } /* namespace */

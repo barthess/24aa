@@ -47,7 +47,7 @@ expected.
 
 #include "ch.hpp"
 
-#include "eeprom_mtd.hpp"
+#include "mtd_at24.hpp"
 
 namespace nvram {
 
@@ -85,23 +85,8 @@ namespace nvram {
 /**
  *
  */
-void EepromMtd::wait_for_sync(void){
+void MtdAT24::wait_for_sync(void) {
   osalThreadSleep(eeprom_cfg->writetime);
-}
-
-/**
- * @brief   Write data that can be fitted in single page boundary
- */
-size_t EepromMtd::fitted_write(const uint8_t *data, size_t len, size_t offset){
-
-  osalDbgAssert(len != 0, "something broken in higher level");
-  osalDbgAssert((offset + len) <= (eeprom_cfg->pages * eeprom_cfg->pagesize),
-             "Transaction out of device bounds");
-  osalDbgAssert(((offset / eeprom_cfg->pagesize) ==
-             ((offset + len - 1) / eeprom_cfg->pagesize)),
-             "Data can not be fitted in single page");
-
-  return write_impl(data, len, offset);
 }
 
 /*
@@ -113,85 +98,59 @@ size_t EepromMtd::fitted_write(const uint8_t *data, size_t len, size_t offset){
 /**
  *
  */
-EepromMtd::EepromMtd(const MtdConfig *mtd_cfg, const EepromConfig *eeprom_cfg) :
-Mtd(mtd_cfg),
+MtdAT24::MtdAT24(Bus &bus, const AT24Config *eeprom_cfg) :
+Mtd(bus),
 eeprom_cfg(eeprom_cfg)
 {
   osalDbgAssert(sizeof(writebuf) == eeprom_cfg->pagesize + NVRAM_ADDRESS_BYTES,
-      "Buffer size must be equal pagesize + address bytes");
+      "Buffer size must be equal to (pagesize + address bytes)");
 }
 
 /**
  *
  */
-msg_t EepromMtd::write(const uint8_t *data, size_t len, size_t offset){
-
-  /* bytes to be written at one transaction */
-  size_t L = 0;
-  /* total bytes successfully written */
-  size_t written = 0;
-  /* cached value */
-  uint16_t pagesize = eeprom_cfg->pagesize;
-  /* first page to be affected during transaction */
-  uint32_t firstpage = offset / pagesize;
-  /* last page to be affected during transaction */
-  uint32_t lastpage = (offset + len - 1) / pagesize;
-
-  /* data fits in single page */
-  if (firstpage == lastpage){
-    L = len;
-    written += fitted_write(data, L, offset);
-    data += L;
-    offset += L;
-    goto EXIT;
-  }
-  else{
-    /* write first piece of data to the first page boundary */
-    L = firstpage * pagesize + pagesize - offset;
-    written += fitted_write(data, L, offset);
-    data += L;
-    offset += L;
-
-    /* now writes blocks at a size of pages (may be no one) */
-    L = pagesize;
-    while ((len - written) > pagesize){
-      written += fitted_write(data, L, offset);
-      data += L;
-      offset += L;
-    }
-
-    /* write tail */
-    L = len - written;
-    if (0 == L)
-      goto EXIT;
-    else{
-      written += fitted_write(data, L, offset);
-    }
-  }
-
-EXIT:
-  if (written == len)
-    return MSG_OK;
-  else
-    return MSG_RESET;
+msg_t MtdAT24::read(uint8_t *data, size_t len, size_t offset) {
+  return read_type24(data, len, offset);
 }
 
 /**
  *
  */
-msg_t EepromMtd::shred(uint8_t pattern){
+msg_t MtdAT24::write(const uint8_t *data, size_t len, size_t offset) {
+
+  osalDbgAssert(len != 0, "something broken in higher level");
+  osalDbgAssert((offset + len) <= (eeprom_cfg->pages * eeprom_cfg->pagesize),
+             "Transaction out of device bounds");
+  osalDbgAssert(((offset / eeprom_cfg->pagesize) ==
+             ((offset + len - 1) / eeprom_cfg->pagesize)),
+             "Data can not be fitted in single page");
+
+  return write_type24(data, len, offset);
+}
+
+/**
+ *
+ */
+msg_t MtdAT24::erase() {
 
   osalDbgAssert(sizeof(writebuf) == eeprom_cfg->pagesize + NVRAM_ADDRESS_BYTES,
           "Buffer size must be equal pagesize + address bytes");
 
-  return shred_impl(pattern);
+  return erase_type24();
 }
 
 /**
  * @brief   Return device capacity in bytes
  */
-size_t EepromMtd::capacity(void){
+uint32_t MtdAT24::capacity(void) {
   return eeprom_cfg->pagesize * eeprom_cfg->pages;
+}
+
+/**
+ *
+ */
+uint32_t MtdAT24::pagesize(void) {
+  return eeprom_cfg->pagesize;
 }
 
 } /* namespace */

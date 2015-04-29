@@ -23,18 +23,18 @@
 #define NVRAM_FILE_HPP_
 
 #include "fs.hpp"
-#include "mtd.hpp"
+#include "blk_dev.hpp"
 
 namespace nvram {
 
 /**
  *
  */
-class File : public chibios_fs::BaseFileStreamInterface{
+class File : public chibios_fs::BaseFileStreamInterface {
   friend class Fs;
 public:
   File(void);
-  void __test_ctor(Mtd *mtd, chibios_fs::fileoffset_t start, chibios_fs::fileoffset_t size);
+  void __test_ctor(BlkDev *blk, chibios_fs::fileoffset_t start, chibios_fs::fileoffset_t size);
   uint32_t getAndClearLastError(void);
   chibios_fs::fileoffset_t getSize(void);
   chibios_fs::fileoffset_t getPosition(void);
@@ -55,7 +55,7 @@ public:
 private:
   size_t clamp_size(size_t n);
   void close(void);
-  Mtd *mtd;
+  BlkDev *blk;
   uint16_t start; /* file start in bytes relative to device start */
   uint16_t size;  /* size (bytes) */
   uint16_t tip;   /* current position in file (bytes) */

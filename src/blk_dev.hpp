@@ -19,8 +19,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef FRAM_MTD_HPP_
-#define FRAM_MTD_HPP_
+#ifndef NVRAM_BLK_DEV_HPP_
+#define NVRAM_BLK_DEV_HPP_
 
 #include "mtd.hpp"
 
@@ -29,29 +29,26 @@ namespace nvram {
 /**
  *
  */
-typedef struct {
-  /**
-   * Size of memory array in bytes.
-   * Consult datasheet!!!
-   */
-  size_t        size;
-}FramConfig;
-
-/**
- *
- */
-class FramMtd : public Mtd {
+class BlkDev {
 public:
-  FramMtd(const MtdConfig *mtd_cfg, const FramConfig *fram_cfg);
+  BlkDev(Mtd &mtd);
   msg_t write(const uint8_t *data, size_t len, size_t offset);
-  msg_t shred(uint8_t pattern);
-  size_t capacity(void);
+
+  msg_t read(uint8_t *data, size_t len, size_t offset) {
+    return mtd.read(data, len, offset);
+  }
+
+  msg_t erase(void){
+    return mtd.erase();
+  }
+
+  size_t capacity(void) {
+    return mtd.capacity();
+  }
 private:
-  void wait_for_sync(void);
-  void fitted_write(const uint8_t *data, size_t len, size_t offset, uint32_t *written);
-  const FramConfig *fram_cfg;
+  Mtd &mtd;
 };
 
 } /* namespace */
 
-#endif /* FRAM_MTD_HPP_ */
+#endif /* NVRAM_BLK_DEV_HPP_ */

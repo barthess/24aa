@@ -20,8 +20,7 @@
 */
 
 #include "ch.hpp"
-
-#include "fram_mtd.hpp"
+#include "mtd_fm24.hpp"
 
 namespace nvram {
 
@@ -59,7 +58,7 @@ namespace nvram {
 /**
  *
  */
-void FramMtd::wait_for_sync(void){
+void MtdFM24::wait_for_sync(void){
   return;
 }
 
@@ -71,8 +70,8 @@ void FramMtd::wait_for_sync(void){
 /**
  *
  */
-FramMtd::FramMtd(const MtdConfig *mtd_cfg, const FramConfig *fram_cfg):
-Mtd(mtd_cfg),
+MtdFM24::MtdFM24(Bus &bus, const FM24Config *fram_cfg):
+Mtd(bus),
 fram_cfg(fram_cfg)
 {
   osalDbgAssert(sizeof(writebuf) >= (8 + NVRAM_ADDRESS_BYTES),
@@ -82,7 +81,14 @@ fram_cfg(fram_cfg)
 /**
  *
  */
-msg_t FramMtd::write(const uint8_t *data, size_t len, size_t offset){
+msg_t MtdFM24::read(uint8_t *data, size_t len, size_t offset) {
+  return read_type24(data, len, offset);
+}
+
+/**
+ *
+ */
+msg_t MtdFM24::write(const uint8_t *data, size_t len, size_t offset){
 
   size_t written = 0;
   const size_t blocksize = sizeof(writebuf) - NVRAM_ADDRESS_BYTES;
@@ -91,7 +97,7 @@ msg_t FramMtd::write(const uint8_t *data, size_t len, size_t offset){
 
   /* write big blocks */
   for (size_t i=0; i<big_writes; i++){
-    written = write_impl(data, blocksize, offset);
+    written = write_type24(data, blocksize, offset);
     if (blocksize == written){
       data += written;
       offset += written;
@@ -102,7 +108,7 @@ msg_t FramMtd::write(const uint8_t *data, size_t len, size_t offset){
 
   /* write tail (if any) */
   if (small_write_size > 0){
-    written = write_impl(data, small_write_size, offset);
+    written = write_type24(data, small_write_size, offset);
     if (small_write_size != written)
       return MSG_RESET;
   }
@@ -113,19 +119,26 @@ msg_t FramMtd::write(const uint8_t *data, size_t len, size_t offset){
 /**
  * @brief   Return device capacity in bytes
  */
-size_t FramMtd::capacity(void){
+uint32_t MtdFM24::capacity(void) {
   return fram_cfg->size;
 }
 
 /**
  *
  */
-msg_t FramMtd::shred(uint8_t pattern){
+uint32_t MtdFM24::pagesize(void) {
+  return capacity();
+}
+
+/**
+ *
+ */
+msg_t MtdFM24::erase(void) {
 
   osalDbgAssert(0 == (capacity() % (sizeof(writebuf) - NVRAM_ADDRESS_BYTES)),
       "Device size must be divided by write buffer without remainder");
 
-  return shred_impl(pattern);
+  return erase_type24();
 }
 
 } /* namespace */

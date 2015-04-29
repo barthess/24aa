@@ -19,49 +19,23 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef EEPROM_MTD_HPP_
-#define EEPROM_MTD_HPP_
+#ifndef NVRAM_BUS_HPP_
+#define NVRAM_BUS_HPP_
 
-#include "mtd.hpp"
+#include "ch.hpp"
+#include "hal.h"
 
 namespace nvram {
 
 /**
  *
  */
-typedef struct {
-  /**
-   * Time needed by IC for single page writing.
-   * Consult datasheet!!!
-   */
-  systime_t     writetime;
-  /**
-   * Size of memory array in pages.
-   * Consult datasheet!!!
-   */
-  size_t        pages;
-  /**
-   * Size of single page in bytes.
-   * Consult datasheet!!!
-   */
-  size_t        pagesize;
-}EepromConfig;
-
-/**
- *
- */
-class EepromMtd : public Mtd {
+class Bus {
 public:
-  EepromMtd(const MtdConfig *mtd_cfg, const EepromConfig *eeprom_cfg);
-  msg_t write(const uint8_t *data, size_t len, size_t offset);
-  msg_t shred(uint8_t pattern);
-  size_t capacity(void);
-private:
-  void wait_for_sync(void);
-  size_t fitted_write(const uint8_t *data, size_t len, size_t offset);
-  const EepromConfig *eeprom_cfg;
+  virtual msg_t exchange(const uint8_t *txbuf, size_t txbytes,
+                               uint8_t *rxbuf, size_t rxbytes) = 0;
 };
 
 } /* namespace */
 
-#endif /* EEPROM_MTD_HPP_ */
+#endif /* NVRAM_BUS_HPP_ */
