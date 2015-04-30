@@ -70,7 +70,7 @@ namespace nvram {
  * @param[in] txbuf pointer to driver transmit buffer
  * @param[in] addr  internal EEPROM device address
  */
-void Mtd::split_addr(uint8_t *txbuf, uint32_t addr, size_t addr_len) {
+void Mtd::addr2buf(uint8_t *txbuf, uint32_t addr, size_t addr_len) {
   osalDbgCheck(addr_len <= sizeof(addr));
 
   switch (addr_len) {
@@ -152,7 +152,7 @@ msg_t Mtd::read_type24(uint8_t *data, size_t len, size_t offset) {
   osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
 
   this->acquire();
-  split_addr(writebuf, offset, NVRAM_ADDRESS_BYTES);
+  addr2buf(writebuf, offset, NVRAM_ADDRESS_BYTES);
   status = bus.exchange(writebuf, NVRAM_ADDRESS_BYTES, data, len);
   this->release();
 
@@ -171,7 +171,7 @@ size_t Mtd::write_type24(const uint8_t *data, size_t len, size_t offset) {
   mtd_led_on();
   this->acquire();
 
-  split_addr(writebuf, offset, NVRAM_ADDRESS_BYTES);    /* store address bytes */
+  addr2buf(writebuf, offset, NVRAM_ADDRESS_BYTES);    /* store address bytes */
   memcpy(&(writebuf[NVRAM_ADDRESS_BYTES]), data, len);  /* store data bytes */
   status = bus.exchange(writebuf, len+NVRAM_ADDRESS_BYTES, nullptr, 0);
 
@@ -199,7 +199,7 @@ msg_t Mtd::erase_type24(void) {
 
   memset(writebuf, 0xFF, sizeof(writebuf));
   for (size_t i=0; i<total_writes; i++){
-    split_addr(writebuf, i * blocksize, NVRAM_ADDRESS_BYTES);
+    addr2buf(writebuf, i * blocksize, NVRAM_ADDRESS_BYTES);
     status = bus.exchange(writebuf, sizeof(writebuf), nullptr, 0);
     osalDbgCheck(MSG_OK == status);
     wait_for_sync();

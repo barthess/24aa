@@ -54,6 +54,38 @@ namespace nvram {
 /**
  *
  */
+enum class NvramType {
+  at24,
+  fm24
+};
+
+/**
+ *
+ */
+struct MtdConfig {
+  /**
+   * @brief   Time needed by IC for single page writing.
+   */
+  systime_t     writetime;
+  /**
+   * @brief   Size of memory array in pages.
+   * @note    For FRAM set it to 1.
+   */
+  uint32_t      pages;
+  /**
+   * @brief   Size of single page in bytes.
+   * @note    For FRAM set it to whole array size.
+   */
+  uint32_t      pagesize;
+  /**
+   * @brief   Memory type.
+   */
+  NvramType     type;
+};
+
+/**
+ *
+ */
 class Mtd {
 public:
   Mtd(Bus &bus);
@@ -67,7 +99,7 @@ protected:
   size_t write_type24(const uint8_t *data, size_t len, size_t offset);
   msg_t read_type24(uint8_t *data, size_t len, size_t offset);
   virtual void wait_for_sync(void) = 0;
-  void split_addr(uint8_t *txbuf, uint32_t addr, size_t addr_len);
+  void addr2buf(uint8_t *txbuf, uint32_t addr, size_t addr_len);
   void acquire(void);
   void release(void);
   #if MTD_USE_MUTUAL_EXCLUSION
