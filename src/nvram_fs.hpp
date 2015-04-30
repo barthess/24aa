@@ -22,7 +22,7 @@
 #ifndef NVRAM_FS_HPP_
 #define NVRAM_FS_HPP_
 
-#include "blk_dev.hpp"
+#include "mtd.hpp"
 #include "nvram_file.hpp"
 
 #if !defined(NVRAM_FS_MAX_FILE_NAME_LEN)
@@ -31,10 +31,6 @@
 
 #if !defined(NVRAM_FS_MAX_FILE_CNT)
 #define NVRAM_FS_MAX_FILE_CNT             3
-#endif
-
-#if NVRAM_FS_USE_DELETE_AND_RESIZE
-#warning "Experimental untested feature enabled"
 #endif
 
 namespace nvram {
@@ -81,10 +77,6 @@ public:
   bool mkfs(void);
   bool fsck(void);
   chibios_fs::fileoffset_t df(void);
-#if NVRAM_FS_USE_DELETE_AND_RESIZE
-  bool rm(const char *name);
-  bool resize(const char *name, size_t newsize);
-#endif
 private:
   uint8_t get_checksum(void);
   uint8_t get_file_cnt(void);
@@ -94,12 +86,8 @@ private:
   void write_toc_item(const toc_item_t *result, uint8_t num);
   void open_super(void);
   void seal(void);
-#if NVRAM_FS_USE_DELETE_AND_RESIZE
-  void lock(void);
-  void unlock(void);
-#endif
   int find(const char *name, toc_item_t *ti);
-  BlkDev blk;
+  Mtd &mtd;
   File super;
   File fat[NVRAM_FS_MAX_FILE_CNT];
   /* Counter for opened files. In unmounted state this value must be 0.

@@ -33,11 +33,6 @@ namespace nvram {
  * DEFINES
  ******************************************************************************
  */
-#if defined(SAM7_PLATFORM)
-#define EEPROM_I2C_CLOCK (MCK / (((this->cfg->i2cp->config->cwgr & 0xFF) + ((this->cfg->i2cp->config->cwgr >> 8) & 0xFF)) * (1 << ((this->cfg->i2cp->config->cwgr >> 16) & 7)) + 6))
-#else
-#define EEPROM_I2C_CLOCK (this->cfg->i2cp->config->clock_speed)
-#endif
 
 /*
  ******************************************************************************
@@ -98,23 +93,16 @@ void Mtd::addr2buf(uint8_t *txbuf, uint32_t addr, size_t addr_len) {
   }
 }
 
-/*
- ******************************************************************************
- * EXPORTED FUNCTIONS
- ******************************************************************************
- */
-
 /**
  *
  */
-Mtd::Mtd(Bus &bus) :
-bus(bus)
-#if (MTD_USE_MUTUAL_EXCLUSION && !CH_CFG_USE_MUTEXES)
-  ,semaphore(1)
-#endif
-{
-  return;
+void Mtd::wait_for_sync(void) {
+  if (0 == cfg.writetime)
+    return;
+  else
+    osalThreadSleep(cfg.writetime);
 }
+
 
 /**
  *
@@ -143,37 +131,32 @@ void Mtd::release(void) {
 }
 
 /**
- *
+ * @brief   Write data that can be fitted in single page boundary (for EEPROM)
+ *          or can be placed in write buffer (for FRAM)
  */
-msg_t Mtd::read_type24(uint8_t *data, size_t len, size_t offset) {
-
-  msg_t status;
-
-  osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
-
-  this->acquire();
-  addr2buf(writebuf, offset, NVRAM_ADDRESS_BYTES);
-  status = bus.exchange(writebuf, NVRAM_ADDRESS_BYTES, data, len);
-  this->release();
-
-  return status;
+size_t Mtd::write_type25(const uint8_t *data, size_t len, uint32_t offset) {
+  (void)data;
+  (void)len;
+  (void)offset;
+  osalSysHalt("Unrealized");
+  return 0;
 }
 
 /**
  * @brief   Write data that can be fitted in single page boundary (for EEPROM)
  *          or can be placed in write buffer (for FRAM)
  */
-size_t Mtd::write_type24(const uint8_t *data, size_t len, size_t offset) {
+size_t Mtd::write_type24(const uint8_t *data, size_t len, uint32_t offset) {
   msg_t status;
 
-  osalDbgCheck((sizeof(writebuf) - NVRAM_ADDRESS_BYTES) >= len);
+  osalDbgCheck((sizeof(writebuf) - cfg.addr_len) >= len);
 
   mtd_led_on();
   this->acquire();
 
-  addr2buf(writebuf, offset, NVRAM_ADDRESS_BYTES);    /* store address bytes */
-  memcpy(&(writebuf[NVRAM_ADDRESS_BYTES]), data, len);  /* store data bytes */
-  status = bus.exchange(writebuf, len+NVRAM_ADDRESS_BYTES, nullptr, 0);
+  addr2buf(writebuf, offset, cfg.addr_len);    /* store address bytes */
+  memcpy(&(writebuf[cfg.addr_len]), data, len);  /* store data bytes */
+  status = bus.exchange(writebuf, len+cfg.addr_len, nullptr, 0);
 
   wait_for_sync();
   this->release();
@@ -188,18 +171,167 @@ size_t Mtd::write_type24(const uint8_t *data, size_t len, size_t offset) {
 /**
  *
  */
+msg_t Mtd::fitted_write(const uint8_t *data, size_t len, uint32_t offset) {
+
+  osalDbgAssert(len != 0, "something broken in higher level");
+  osalDbgAssert((offset + len) <= (cfg.pages * cfg.pagesize),
+             "Transaction out of device bounds");
+  osalDbgAssert(((offset / cfg.pagesize) ==
+             ((offset + len - 1) / cfg.pagesize)),
+             "Data can not be fitted in single page");
+
+  switch (cfg.type) {
+  case NvramType::at24:
+  case NvramType::fm24:
+    if (len == write_type24(data, len, offset))
+      return MSG_OK;
+    else
+      return MSG_RESET;
+    break;
+
+  case NvramType::s25:
+  case NvramType::fm25:
+    if (len == write_type25(data, len, offset))
+      return MSG_OK;
+    else
+      return MSG_RESET;
+    break;
+
+  default:
+    osalSysHalt("Unrealized");
+    return MSG_RESET;
+    break;
+  }
+}
+
+/**
+ * @brief   Splits big transaction into smaller ones fitted into driver's buffer.
+ */
+msg_t Mtd::split_buffer(const uint8_t *data, size_t len, uint32_t offset) {
+  size_t written = 0;
+  const uint32_t blocksize = sizeof(writebuf) - cfg.addr_len;
+  const uint32_t big_writes = len / blocksize;
+  const uint32_t small_write_size = len % blocksize;
+
+  /* write big blocks */
+  for (size_t i=0; i<big_writes; i++){
+    written = fitted_write(data, blocksize, offset);
+    if (blocksize == written){
+      data += written;
+      offset += written;
+    }
+    else
+      return MSG_RESET;
+  }
+
+  /* write tail (if any) */
+  if (small_write_size > 0){
+    written = fitted_write(data, small_write_size, offset);
+    if (small_write_size != written)
+      return MSG_RESET;
+  }
+
+  return MSG_OK; /* */
+}
+
+/**
+ * @brief   Splits big transaction into smaller ones fitted into memory page.
+ */
+msg_t Mtd::split_page(const uint8_t *data, size_t len, uint32_t offset) {
+
+  /* bytes to be written at one transaction */
+  size_t L = 0;
+  /* total bytes successfully written */
+  size_t written = 0;
+  /* cached value */
+  const uint32_t pagesize = cfg.pagesize;
+  /* first page to be affected during transaction */
+  const uint32_t firstpage = offset / pagesize;
+  /* last page to be affected during transaction */
+  const uint32_t lastpage = (offset + len - 1) / pagesize;
+
+  /* data fits in single page */
+  if (firstpage == lastpage) {
+    L = len;
+    written += fitted_write(data, L, offset);
+    data += L;
+    offset += L;
+    goto EXIT;
+  }
+  else{
+    /* write first piece of data to the first page boundary */
+    L = firstpage * pagesize + pagesize - offset;
+    written += fitted_write(data, L, offset);
+    data += L;
+    offset += L;
+
+    /* now writes blocks at a size of pages (may be no one) */
+    L = pagesize;
+    while ((len - written) > pagesize){
+      written += fitted_write(data, L, offset);
+      data += L;
+      offset += L;
+    }
+
+    /* write tail */
+    L = len - written;
+    if (0 == L)
+      goto EXIT;
+    else{
+      written += fitted_write(data, L, offset);
+    }
+  }
+
+EXIT:
+  if (written == len)
+    return MSG_OK;
+  else
+    return MSG_RESET;
+}
+
+/**
+ *
+ */
+msg_t Mtd::read_type24(uint8_t *data, size_t len, size_t offset) {
+
+  msg_t status;
+
+  osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
+
+  this->acquire();
+  addr2buf(writebuf, offset, cfg.addr_len);
+  status = bus.exchange(writebuf, cfg.addr_len, data, len);
+  this->release();
+
+  return status;
+}
+
+/**
+ *
+ */
+msg_t Mtd::read_type25(uint8_t *data, size_t len, size_t offset) {
+  (void)data;
+  (void)len;
+  (void)offset;
+  osalSysHalt("Unrealized");
+  return MSG_RESET;
+}
+
+/**
+ *
+ */
 msg_t Mtd::erase_type24(void) {
   msg_t status;
 
   mtd_led_on();
   this->acquire();
 
-  size_t blocksize = (sizeof(writebuf) - NVRAM_ADDRESS_BYTES);
+  size_t blocksize = (sizeof(writebuf) - cfg.addr_len);
   size_t total_writes = capacity() / blocksize;
 
   memset(writebuf, 0xFF, sizeof(writebuf));
   for (size_t i=0; i<total_writes; i++){
-    addr2buf(writebuf, i * blocksize, NVRAM_ADDRESS_BYTES);
+    addr2buf(writebuf, i * blocksize, cfg.addr_len);
     status = bus.exchange(writebuf, sizeof(writebuf), nullptr, 0);
     osalDbgCheck(MSG_OK == status);
     wait_for_sync();
@@ -210,109 +342,77 @@ msg_t Mtd::erase_type24(void) {
   return MSG_OK;
 }
 
-#if NVRAM_FS_USE_DELETE_AND_RESIZE
+/**
+ *
+ */
+msg_t Mtd::erase_type25(void) {
+  osalSysHalt("Unrealized");
+  return MSG_RESET;
+}
+
+/*
+ ******************************************************************************
+ * EXPORTED FUNCTIONS
+ ******************************************************************************
+ */
 
 /**
  *
  */
-msg_t Mtd::move_left(size_t len, size_t blkstart, size_t shift) {
-
-  const size_t N = 16;
-  uint8_t buf[N];
-  size_t dst, src, progress, tail;
-  msg_t ret;
-
-  osalDbgAssert((blkstart >= shift), "MTD underflow");
-  osalDbgCheck(len > 0);
-
-  if (0 == shift)
-    return MSG_OK; /* nothing to do */
-
-  /* process blocks */
-  progress = N;
-  while (progress < len) {
-    src  = blkstart + progress - N;
-    dst = src - shift;
-
-    ret = read(buf, src, N);
-    if (MSG_OK != ret)
-      return ret;
-
-    ret = write(buf, dst, N);
-    if (MSG_OK != ret)
-      return ret;
-
-    progress += N;
-  }
-
-  /* process tail (if any) */
-  tail = len % N;
-  if (tail > 0) {
-    src  = blkstart + len - tail;
-    dst = src - shift;
-
-    ret = read(buf, src, tail);
-    if (MSG_OK != ret)
-      return ret;
-
-    ret = write(buf, dst, tail);
-    if (MSG_OK != ret)
-      return ret;
-  }
-
-  return MSG_OK;
+Mtd::Mtd(Bus &bus, const MtdConfig &cfg) :
+bus(bus),
+cfg(cfg)
+#if (MTD_USE_MUTUAL_EXCLUSION && !CH_CFG_USE_MUTEXES)
+  ,semaphore(1)
+#endif
+{
+  return;
 }
 
 /**
  *
  */
-msg_t Mtd::move_right(size_t len, size_t blkstart, size_t shift) {
-  const size_t N = 16;
-  uint8_t buf[N];
-  size_t dst, src, progress, tail;
-  msg_t ret;
+msg_t Mtd::write(const uint8_t *data, size_t len, uint32_t offset) {
 
-  osalDbgAssert((len + blkstart + shift) < capacity(), "MTD overflow");
-  osalDbgCheck(len > 0);
+  switch(cfg.type) {
+  case NvramType::at24:
+  case NvramType::s25:
+    return split_page(data, len, offset);
+    break;
 
-  if (0 == shift)
-    return MSG_OK; /* nothing to do */
+  case NvramType::fm24:
+  case NvramType::fm25:
+    return split_buffer(data, len, offset);
+    break;
 
-  /* process blocks */
-  progress = N;
-  while (progress < len) {
-    src  = blkstart + len - progress;
-    dst = src + shift;
-
-    ret = read(buf, src, N);
-    if (MSG_OK != ret)
-      return ret;
-
-    ret = write(buf, dst, N);
-    if (MSG_OK != ret)
-      return ret;
-
-    progress += N;
+  default:
+    osalSysHalt("Unrealized");
+    return MSG_RESET;
+    break;
   }
-
-  /* process tail (if any) */
-  tail = len % N;
-  if (tail > 0) {
-    src  = blkstart;
-    dst = src + shift;
-
-    ret = read(buf, src, tail);
-    if (MSG_OK != ret)
-      return ret;
-
-    ret = write(buf, dst, tail);
-    if (MSG_OK != ret)
-      return ret;
-  }
-
-  return MSG_OK;
 }
 
-#endif /* NVRAM_FS_USE_DELETE_AND_RESIZE */
+/**
+ *
+ */
+msg_t Mtd::read(uint8_t *data, size_t len, uint32_t offset) {
+
+  switch(cfg.type) {
+  case NvramType::at24:
+  case NvramType::fm24:
+    return read_type24(data, len, offset);
+    break;
+
+  case NvramType::s25:
+  case NvramType::fm25:
+    return read_type25(data, len, offset);
+    break;
+
+  default:
+    osalSysHalt("Unrealized");
+    return MSG_RESET;
+    break;
+  }
+}
 
 } /* namespace */

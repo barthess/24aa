@@ -101,7 +101,7 @@ msg_t BusI2C::exchange(const uint8_t *txbuf, size_t txbytes,
                              uint8_t *rxbuf, size_t rxbytes) {
 
 #if defined(STM32F1XX_I2C)
-#error "Ugly workaround for single byte reading not implemented yet"
+#error "Ugly workaround for single byte reading is not implemented yet"
   if (1 == len)
     return stm32_f1x_read_single_byte(data, offset);
 #endif /* defined(STM32F1XX_I2C) */

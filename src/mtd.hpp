@@ -28,8 +28,6 @@
 #include "mtd_conf.h"
 #include "bus.hpp"
 
-#define NVRAM_ADDRESS_BYTES                     2
-
 #if !defined(MTD_USE_MUTUAL_EXCLUSION)
 #define MTD_USE_MUTUAL_EXCLUSION                FALSE
 #endif
@@ -41,14 +39,6 @@
 #error "Buffer size must be defined in mtd_conf.h"
 #endif
 
-#if !defined(NVRAM_FS_USE_DELETE_AND_RESIZE)
-#define NVRAM_FS_USE_DELETE_AND_RESIZE          FALSE
-#endif
-
-#if NVRAM_FS_USE_DELETE_AND_RESIZE
-#warning "Experimental untested feature enabled"
-#endif
-
 namespace nvram {
 
 /**
@@ -56,8 +46,12 @@ namespace nvram {
  */
 enum class NvramType {
   at24,
-  fm24
+  s25,
+  fm24,
+  fm25
 };
+
+typedef void (*mtdcb_t)(void);
 
 /**
  *
@@ -78,9 +72,22 @@ struct MtdConfig {
    */
   uint32_t      pagesize;
   /**
+   * @brief   Address length in bytes.
+   */
+  size_t        addr_len;
+  /**
    * @brief   Memory type.
    */
   NvramType     type;
+  /**
+   * @brief   Debug hooks.
+   */
+  mtdcb_t       start_write;
+  mtdcb_t       stop_write;
+  mtdcb_t       start_read;
+  mtdcb_t       stop_read;
+  mtdcb_t       start_erase;
+  mtdcb_t       stop_erase;
 };
 
 /**
@@ -88,17 +95,23 @@ struct MtdConfig {
  */
 class Mtd {
 public:
-  Mtd(Bus &bus);
-  virtual msg_t read(uint8_t *data, size_t len, size_t offset) = 0;
-  virtual msg_t write(const uint8_t *data, size_t len, size_t offset) = 0;
-  virtual msg_t erase(void) = 0;
-  virtual uint32_t capacity(void) = 0;
-  virtual uint32_t pagesize(void) = 0;
+  Mtd(Bus &bus, const MtdConfig &cfg);
+  msg_t write(const uint8_t *data, size_t len, uint32_t offset);
+  msg_t read(uint8_t *data, size_t len, uint32_t offset);
+  msg_t erase(void);
+  uint32_t capacity(void) {return cfg.pages * cfg.pagesize;}
+  uint32_t pagesize(void) {return cfg.pagesize;}
 protected:
+  msg_t split_buffer(const uint8_t *data, size_t len, uint32_t offset);
+  msg_t split_page(const uint8_t *data, size_t len, uint32_t offset);
+  msg_t fitted_write(const uint8_t *data, size_t len, uint32_t offset);
+  size_t write_type24(const uint8_t *data, size_t len, uint32_t offset);
+  size_t write_type25(const uint8_t *data, size_t len, uint32_t offset);
   msg_t erase_type24(void);
-  size_t write_type24(const uint8_t *data, size_t len, size_t offset);
-  msg_t read_type24(uint8_t *data, size_t len, size_t offset);
-  virtual void wait_for_sync(void) = 0;
+  msg_t erase_type25(void);
+  msg_t read_type24(uint8_t *data, size_t len, size_t uint32_t);
+  msg_t read_type25(uint8_t *data, size_t len, size_t uint32_t);
+  void wait_for_sync(void);
   void addr2buf(uint8_t *txbuf, uint32_t addr, size_t addr_len);
   void acquire(void);
   void release(void);
@@ -111,6 +124,7 @@ protected:
   #endif /* MTD_USE_MUTUAL_EXCLUSION */
   uint8_t writebuf[MTD_WRITE_BUF_SIZE];
   Bus &bus;
+  const MtdConfig &cfg;
 };
 
 } /* namespace */
