@@ -33,13 +33,15 @@
 #endif
 
 /* The rule of thumb for best performance:
- * 1) for EEPROM set it to size of your IC's page + NVRAM_ADDRESS_BYTES
+ * 1) for EEPROM set it to size of your IC's page + ADDRESS_BYTES
  * 2) for FRAM there is no such strict rule - chose it from 16..64 */
 #if !defined(MTD_WRITE_BUF_SIZE)
 #error "Buffer size must be defined in mtd_conf.h"
 #endif
 
 namespace nvram {
+
+class Mtd; /* forward declaration */
 
 /**
  *
@@ -51,7 +53,7 @@ enum class NvramType {
   fm25
 };
 
-typedef void (*mtdcb_t)(void);
+typedef void (*mtdcb_t)(Mtd *mtd);
 
 /**
  *
@@ -80,7 +82,7 @@ struct MtdConfig {
    */
   NvramType     type;
   /**
-   * @brief   Debug hooks.
+   * @brief   Debug hooks. Set to nullptr if unused.
    */
   mtdcb_t       start_write;
   mtdcb_t       stop_write;
@@ -96,21 +98,21 @@ struct MtdConfig {
 class Mtd {
 public:
   Mtd(Bus &bus, const MtdConfig &cfg);
-  msg_t write(const uint8_t *data, size_t len, uint32_t offset);
-  msg_t read(uint8_t *data, size_t len, uint32_t offset);
+  size_t write(const uint8_t *data, size_t len, uint32_t offset);
+  size_t read(uint8_t *data, size_t len, uint32_t offset);
   msg_t erase(void);
   uint32_t capacity(void) {return cfg.pages * cfg.pagesize;}
   uint32_t pagesize(void) {return cfg.pagesize;}
 protected:
-  msg_t split_buffer(const uint8_t *data, size_t len, uint32_t offset);
-  msg_t split_page(const uint8_t *data, size_t len, uint32_t offset);
-  msg_t fitted_write(const uint8_t *data, size_t len, uint32_t offset);
+  size_t split_buffer(const uint8_t *data, size_t len, uint32_t offset);
+  size_t split_page  (const uint8_t *data, size_t len, uint32_t offset);
+  size_t fitted_write(const uint8_t *data, size_t len, uint32_t offset);
   size_t write_type24(const uint8_t *data, size_t len, uint32_t offset);
   size_t write_type25(const uint8_t *data, size_t len, uint32_t offset);
+  size_t read_type24(uint8_t *data, size_t len, size_t uint32_t);
+  size_t read_type25(uint8_t *data, size_t len, size_t uint32_t);
   msg_t erase_type24(void);
   msg_t erase_type25(void);
-  msg_t read_type24(uint8_t *data, size_t len, size_t uint32_t);
-  msg_t read_type25(uint8_t *data, size_t len, size_t uint32_t);
   void wait_for_sync(void);
   void addr2buf(uint8_t *txbuf, uint32_t addr, size_t addr_len);
   void acquire(void);

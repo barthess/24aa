@@ -34,23 +34,24 @@ class File : public chibios_fs::BaseFileStreamInterface {
   friend class Fs;
 public:
   File(void);
-  void __test_ctor(Mtd *mtd, chibios_fs::fileoffset_t start, chibios_fs::fileoffset_t size);
+  void __test_ctor(Mtd *mtd, uint32_t start, uint32_t size);
   uint32_t getAndClearLastError(void);
-  chibios_fs::fileoffset_t getSize(void);
-  chibios_fs::fileoffset_t getPosition(void);
-  uint32_t setPosition(chibios_fs::fileoffset_t pos);
+  uint32_t getSize(void);
+  uint32_t getPosition(void);
+  uint32_t setPosition(uint32_t pos);
 
   size_t write(const uint8_t *buf, size_t n);
   size_t read(uint8_t *buf, size_t n);
   msg_t put(uint8_t b);
   msg_t get(void);
 
-  uint64_t getU64(void);
-  uint32_t getU32(void);
-  uint16_t getU16(void);
-  size_t putU64(uint64_t data);
-  size_t putU32(uint32_t data);
-  size_t putU16(uint16_t data);
+  template <typename T> size_t put(T data) {
+    return write(reinterpret_cast<uint8_t*>(&data), sizeof(T));
+  }
+
+  template <typename T> size_t get(T *datap) {
+    return read(reinterpret_cast<uint8_t*>(datap), sizeof(T));
+  }
 
 private:
   size_t clamp_size(size_t n);

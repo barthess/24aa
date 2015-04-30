@@ -25,6 +25,7 @@
 #include "nvram_fs.hpp"
 
 using namespace chibios_fs;
+
 namespace nvram {
 
 /*
@@ -286,7 +287,7 @@ filecount_t Fs::get_file_cnt(void){
 /**
  *
  */
-void Fs::write_file_cnt(uint8_t N){
+void Fs::write_file_cnt(filecount_t N){
   size_t status;
 
   status = super.setPosition(sizeof(magic));
@@ -315,7 +316,7 @@ void Fs::read_toc_item(toc_item_t *result, size_t N){
 /**
  *
  */
-void Fs::write_toc_item(const toc_item_t *ti, uint8_t N){
+void Fs::write_toc_item(const toc_item_t *ti, size_t N){
   size_t status;
   const size_t blocklen = sizeof(toc_item_t);
 
@@ -461,7 +462,7 @@ int Fs::find(const char *name, toc_item_t *ti){
 /**
  *
  */
-File* Fs::create(const char *name, chibios_fs::fileoffset_t size){
+File* Fs::create(const char *name, uint32_t size){
   toc_item_t ti;
   int id = -1;
   size_t file_cnt;
@@ -553,7 +554,7 @@ void Fs::close(File *file) {
 /**
  * @brief   Return free disk space
  */
-fileoffset_t Fs::df(void) {
+uint32_t Fs::df(void) {
   toc_item_t ti;
   size_t file_cnt;
 

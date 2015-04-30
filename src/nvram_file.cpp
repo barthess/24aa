@@ -146,7 +146,7 @@ fileoffset_t File::getPosition(void){
 /**
  *
  */
-uint32_t File::setPosition(fileoffset_t offset){
+uint32_t File::setPosition(uint32_t offset){
   osalDbgAssert(NULL != this->mtd, "File not opened");
 
   uint32_t size = getSize();
@@ -161,7 +161,8 @@ uint32_t File::setPosition(fileoffset_t offset){
 /**
  *
  */
-size_t File::read(uint8_t *buf, size_t n){
+size_t File::read(uint8_t *buf, size_t n) {
+  size_t acquired;
 
   osalDbgAssert(NULL != this->mtd, "File not opened");
   osalDbgCheck(NULL != buf);
@@ -170,18 +171,17 @@ size_t File::read(uint8_t *buf, size_t n){
   if (0 == n)
     return 0;
 
-  if (MSG_OK == mtd->read(buf, n, tip + start)){
-    tip += n;
-    return n;
-  }
-  else
-    return 0;
+  acquired = mtd->read(buf, n, tip + start);
+  tip += acquired;
+  return acquired;
 }
 
 /**
  *
  */
-size_t File::write(const uint8_t *buf, size_t n){
+size_t File::write(const uint8_t *buf, size_t n) {
+
+  size_t written;
 
   osalDbgAssert(NULL != this->mtd, "File not opened");
   osalDbgCheck(NULL != buf);
@@ -190,60 +190,9 @@ size_t File::write(const uint8_t *buf, size_t n){
   if (0 == n)
     return 0;
 
-  if (MSG_OK == mtd->write(buf, n, tip + start)){
-    tip += n;
-    return n;
-  }
-  else
-    return 0;
-}
-
-/**
- *
- */
-uint64_t File::getU64(void){
-  uint64_t ret;
-  read((uint8_t *)&ret, sizeof(ret));
-  return ret;
-}
-
-/**
- *
- */
-uint32_t File::getU32(void){
-  uint32_t ret;
-  read((uint8_t *)&ret, sizeof(ret));
-  return ret;
-}
-
-/**
- *
- */
-uint16_t File::getU16(void){
-  uint16_t ret;
-  read((uint8_t *)&ret, sizeof(ret));
-  return ret;
-}
-
-/**
- *
- */
-size_t File::putU64(uint64_t data){
-  return write((uint8_t *)&data, sizeof(data));
-}
-
-/**
- *
- */
-size_t File::putU32(uint32_t data){
-  return write((uint8_t *)&data, sizeof(data));
-}
-
-/**
- *
- */
-size_t File::putU16(uint16_t data){
-  return write((uint8_t *)&data, sizeof(data));
+  written = mtd->write(buf, n, tip + start);
+  tip += written;
+  return written;
 }
 
 } /* namespace */

@@ -171,73 +171,66 @@ size_t Mtd::write_type24(const uint8_t *data, size_t len, uint32_t offset) {
 /**
  *
  */
-msg_t Mtd::fitted_write(const uint8_t *data, size_t len, uint32_t offset) {
+size_t Mtd::fitted_write(const uint8_t *data, size_t len, uint32_t offset) {
 
   osalDbgAssert(len != 0, "something broken in higher level");
   osalDbgAssert((offset + len) <= (cfg.pages * cfg.pagesize),
              "Transaction out of device bounds");
-  osalDbgAssert(((offset / cfg.pagesize) ==
-             ((offset + len - 1) / cfg.pagesize)),
+  osalDbgAssert(((offset / cfg.pagesize) == ((offset + len - 1) / cfg.pagesize)),
              "Data can not be fitted in single page");
 
   switch (cfg.type) {
   case NvramType::at24:
   case NvramType::fm24:
-    if (len == write_type24(data, len, offset))
-      return MSG_OK;
-    else
-      return MSG_RESET;
-    break;
+    return write_type24(data, len, offset);
 
   case NvramType::s25:
   case NvramType::fm25:
-    if (len == write_type25(data, len, offset))
-      return MSG_OK;
-    else
-      return MSG_RESET;
-    break;
+    return write_type25(data, len, offset);
 
   default:
     osalSysHalt("Unrealized");
-    return MSG_RESET;
-    break;
+    return 0;
   }
 }
 
 /**
  * @brief   Splits big transaction into smaller ones fitted into driver's buffer.
  */
-msg_t Mtd::split_buffer(const uint8_t *data, size_t len, uint32_t offset) {
+size_t Mtd::split_buffer(const uint8_t *data, size_t len, uint32_t offset) {
   size_t written = 0;
+  size_t tmp;
   const uint32_t blocksize = sizeof(writebuf) - cfg.addr_len;
   const uint32_t big_writes = len / blocksize;
   const uint32_t small_write_size = len % blocksize;
 
   /* write big blocks */
-  for (size_t i=0; i<big_writes; i++){
-    written = fitted_write(data, blocksize, offset);
-    if (blocksize == written){
-      data += written;
-      offset += written;
+  for (size_t i=0; i<big_writes; i++) {
+    tmp = fitted_write(data, blocksize, offset);
+    if (blocksize == tmp) {
+      data += tmp;
+      offset += tmp;
+      written += tmp;
     }
     else
-      return MSG_RESET;
+      goto EXIT;
   }
 
   /* write tail (if any) */
-  if (small_write_size > 0){
-    written = fitted_write(data, small_write_size, offset);
-    if (small_write_size != written)
-      return MSG_RESET;
+  if (small_write_size > 0) {
+    tmp = fitted_write(data, small_write_size, offset);
+    if (small_write_size == tmp)
+      written += tmp;
   }
 
-  return MSG_OK; /* */
+EXIT:
+  return written;
 }
 
 /**
  * @brief   Splits big transaction into smaller ones fitted into memory page.
  */
-msg_t Mtd::split_page(const uint8_t *data, size_t len, uint32_t offset) {
+size_t Mtd::split_page(const uint8_t *data, size_t len, uint32_t offset) {
 
   /* bytes to be written at one transaction */
   size_t L = 0;
@@ -283,16 +276,13 @@ msg_t Mtd::split_page(const uint8_t *data, size_t len, uint32_t offset) {
   }
 
 EXIT:
-  if (written == len)
-    return MSG_OK;
-  else
-    return MSG_RESET;
+  return written;
 }
 
 /**
  *
  */
-msg_t Mtd::read_type24(uint8_t *data, size_t len, size_t offset) {
+size_t Mtd::read_type24(uint8_t *data, size_t len, size_t offset) {
 
   msg_t status;
 
@@ -303,18 +293,21 @@ msg_t Mtd::read_type24(uint8_t *data, size_t len, size_t offset) {
   status = bus.exchange(writebuf, cfg.addr_len, data, len);
   this->release();
 
-  return status;
+  if (MSG_OK == status)
+    return len;
+  else
+    return 0;
 }
 
 /**
  *
  */
-msg_t Mtd::read_type25(uint8_t *data, size_t len, size_t offset) {
+size_t Mtd::read_type25(uint8_t *data, size_t len, size_t offset) {
   (void)data;
   (void)len;
   (void)offset;
   osalSysHalt("Unrealized");
-  return MSG_RESET;
+  return 0;
 }
 
 /**
@@ -372,46 +365,40 @@ cfg(cfg)
 /**
  *
  */
-msg_t Mtd::write(const uint8_t *data, size_t len, uint32_t offset) {
+size_t Mtd::write(const uint8_t *data, size_t len, uint32_t offset) {
 
   switch(cfg.type) {
   case NvramType::at24:
   case NvramType::s25:
     return split_page(data, len, offset);
-    break;
 
   case NvramType::fm24:
   case NvramType::fm25:
     return split_buffer(data, len, offset);
-    break;
 
   default:
     osalSysHalt("Unrealized");
-    return MSG_RESET;
-    break;
+    return 0;
   }
 }
 
 /**
  *
  */
-msg_t Mtd::read(uint8_t *data, size_t len, uint32_t offset) {
+size_t Mtd::read(uint8_t *data, size_t len, uint32_t offset) {
 
   switch(cfg.type) {
   case NvramType::at24:
   case NvramType::fm24:
     return read_type24(data, len, offset);
-    break;
 
   case NvramType::s25:
   case NvramType::fm25:
     return read_type25(data, len, offset);
-    break;
 
   default:
     osalSysHalt("Unrealized");
-    return MSG_RESET;
-    break;
+    return 0;
   }
 }
 

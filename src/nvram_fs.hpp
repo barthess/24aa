@@ -71,19 +71,19 @@ public:
   Fs(Mtd &mtd);
   File *open(const char *name);
   void close(File *file);
-  File *create(const char *name, chibios_fs::fileoffset_t size);
+  File *create(const char *name, uint32_t size);
   bool mount(void);
   bool umount(void);
   bool mkfs(void);
   bool fsck(void);
-  chibios_fs::fileoffset_t df(void);
+  uint32_t df(void);
 private:
-  uint8_t get_checksum(void);
-  uint8_t get_file_cnt(void);
-  void write_file_cnt(uint8_t cnt);
+  checksum_t get_checksum(void);
+  filecount_t get_file_cnt(void);
+  void write_file_cnt(filecount_t cnt);
   void get_magic(uint8_t *result);
   void read_toc_item(toc_item_t *result, size_t num);
-  void write_toc_item(const toc_item_t *result, uint8_t num);
+  void write_toc_item(const toc_item_t *result, size_t num);
   void open_super(void);
   void seal(void);
   int find(const char *name, toc_item_t *ti);
