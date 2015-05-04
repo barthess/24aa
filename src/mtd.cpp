@@ -33,6 +33,11 @@ namespace nvram {
  * DEFINES
  ******************************************************************************
  */
+#define     S25_CMD_READ    0x03
+#define     S25_CMD_4READ   0x13
+#define     S25_CMD_PP      0x02  /* page program */
+#define     S25_CMD_4PP     0x12
+#define     S25_CMD_BE      0x60  /* bulk erase */
 
 /*
  ******************************************************************************
@@ -131,32 +136,48 @@ void Mtd::release(void) {
 }
 
 /**
- * @brief   Write data that can be fitted in single page boundary (for EEPROM)
+ * @brief   Accepts data that can be fitted in single page boundary (for EEPROM)
  *          or can be placed in write buffer (for FRAM)
  */
 size_t Mtd::write_type25(const uint8_t *data, size_t len, uint32_t offset) {
-  (void)data;
-  (void)len;
-  (void)offset;
-  osalSysHalt("Unrealized");
-  return 0;
+  msg_t status;
+
+  osalDbgCheck(sizeof(writebuf) >= cfg.pagesize + cfg.addr_len + 1);
+  osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
+
+  /* fill preamble */
+  if (4 == cfg.addr_len)
+    writebuf[0] = S25_CMD_4PP;
+  else
+    writebuf[0] = S25_CMD_PP;
+  addr2buf(&writebuf[1], offset, cfg.addr_len);
+
+  request.fill(data, len, nullptr, 0, writebuf, 1+cfg.addr_len);
+  status = bus.exchange(request);
+
+  if (MSG_OK == status)
+    return len;
+  else
+    return 0;
 }
 
 /**
- * @brief   Write data that can be fitted in single page boundary (for EEPROM)
+ * @brief   Accepts data that can be fitted in single page boundary (for EEPROM)
  *          or can be placed in write buffer (for FRAM)
  */
 size_t Mtd::write_type24(const uint8_t *data, size_t len, uint32_t offset) {
   msg_t status;
 
   osalDbgCheck((sizeof(writebuf) - cfg.addr_len) >= len);
+  osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
 
   mtd_led_on();
   this->acquire();
 
-  addr2buf(writebuf, offset, cfg.addr_len);    /* store address bytes */
-  memcpy(&(writebuf[cfg.addr_len]), data, len);  /* store data bytes */
-  status = bus.exchange(writebuf, len+cfg.addr_len, nullptr, 0);
+  /* write preamble. Only address bytes for this memory type */
+  addr2buf(writebuf, offset, cfg.addr_len);
+  request.fill(data, len, nullptr, 0, writebuf, cfg.addr_len);
+  status = bus.exchange(request);
 
   wait_for_sync();
   this->release();
@@ -283,14 +304,15 @@ EXIT:
  *
  */
 size_t Mtd::read_type24(uint8_t *data, size_t len, size_t offset) {
-
   msg_t status;
 
   osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
+  osalDbgCheck(sizeof(writebuf) >= cfg.addr_len);
 
   this->acquire();
   addr2buf(writebuf, offset, cfg.addr_len);
-  status = bus.exchange(writebuf, cfg.addr_len, data, len);
+  request.fill(nullptr, 0, data, len, writebuf, cfg.addr_len);
+  status = bus.exchange(request);
   this->release();
 
   if (MSG_OK == status)
@@ -303,11 +325,25 @@ size_t Mtd::read_type24(uint8_t *data, size_t len, size_t offset) {
  *
  */
 size_t Mtd::read_type25(uint8_t *data, size_t len, size_t offset) {
-  (void)data;
-  (void)len;
-  (void)offset;
-  osalSysHalt("Unrealized");
-  return 0;
+  msg_t status;
+
+  osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
+  osalDbgCheck(sizeof(writebuf) >= cfg.addr_len + 1);
+
+  /* fill preamble */
+  if (4 == cfg.addr_len)
+    writebuf[0] = S25_CMD_4READ;
+  else
+    writebuf[0] = S25_CMD_READ;
+  addr2buf(&writebuf[1], offset, cfg.addr_len);
+
+  request.fill(nullptr, 0, data, len, writebuf, 1+cfg.addr_len);
+  status = bus.exchange(request);
+
+  if (MSG_OK == status)
+    return len;
+  else
+    return 0;
 }
 
 /**
@@ -323,24 +359,36 @@ msg_t Mtd::erase_type24(void) {
   size_t total_writes = capacity() / blocksize;
 
   memset(writebuf, 0xFF, sizeof(writebuf));
-  for (size_t i=0; i<total_writes; i++){
+  status = MSG_RESET;
+  for (size_t i=0; i<total_writes; i++) {
     addr2buf(writebuf, i * blocksize, cfg.addr_len);
-    status = bus.exchange(writebuf, sizeof(writebuf), nullptr, 0);
-    osalDbgCheck(MSG_OK == status);
+    request.fill(nullptr, 0, nullptr, 0, writebuf, sizeof(writebuf));
+    status = bus.exchange(request);
     wait_for_sync();
+    if (MSG_OK != status)
+      break;
   }
 
   this->release();
   mtd_led_off();
-  return MSG_OK;
+  return status;
 }
 
 /**
  *
  */
 msg_t Mtd::erase_type25(void) {
-  osalSysHalt("Unrealized");
-  return MSG_RESET;
+
+  mtd_led_on();
+  this->acquire();
+
+  writebuf[0] = S25_CMD_BE;
+  request.fill(nullptr, 0, nullptr, 0, writebuf, 1);
+  bus.exchange(request);
+
+  this->release();
+  mtd_led_off();
+  return MSG_OK;
 }
 
 /*

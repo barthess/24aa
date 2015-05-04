@@ -19,8 +19,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef NVRAM_BUS_I2C_HPP_
-#define NVRAM_BUS_I2C_HPP_
+#ifndef NVRAM_BUS_SPI_HPP_
+#define NVRAM_BUS_SPI_HPP_
 
 #include "ch.hpp"
 #include "hal.h"
@@ -32,19 +32,14 @@ namespace nvram {
 /**
  *
  */
-class BusI2C : public Bus {
+class BusSPI : public Bus {
 public:
-  BusI2C(I2CDriver *i2cp, i2caddr_t addr);
+  BusSPI(SPIDriver *spip);
   msg_t exchange(const BusRequest &request);
 private:
-  msg_t stm32_f1x_read_single_byte(const uint8_t *txbuf, size_t txbytes,
-                                         uint8_t *rxbuf, systime_t tmo);
-  systime_t calc_timeout(size_t bytes);
-  I2CDriver *i2cp;
-  i2caddr_t addr;
-  i2cflags_t i2cflags;
+  SPIDriver *spip;
 };
 
 } /* namespace */
 
-#endif /* NVRAM_BUS_HPP_ */
+#endif /* NVRAM_BUS_SPI_HPP_ */

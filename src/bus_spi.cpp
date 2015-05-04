@@ -20,11 +20,10 @@
 */
 
 #include <cstring>
-#include <cstdlib>
 
 #include "ch.hpp"
 
-#include "bus_i2c.hpp"
+#include "bus_spi.hpp"
 
 namespace nvram {
 
@@ -33,11 +32,6 @@ namespace nvram {
  * DEFINES
  ******************************************************************************
  */
-#if defined(SAM7_PLATFORM)
-#define EEPROM_I2C_CLOCK (MCK / (((this->i2cp->config->cwgr & 0xFF) + ((this->cfg->i2cp->config->cwgr >> 8) & 0xFF)) * (1 << ((this->cfg->i2cp->config->cwgr >> 16) & 7)) + 6))
-#else
-#define EEPROM_I2C_CLOCK (this->i2cp->config->clock_speed)
-#endif
 
 /*
  ******************************************************************************
@@ -65,18 +59,6 @@ namespace nvram {
  ******************************************************************************
  */
 
-/**
- * @brief     Calculates requred timeout.
- */
-systime_t BusI2C::calc_timeout(size_t bytes) {
-  const uint32_t bitsinbyte = 10;
-  uint32_t tmo;
-  tmo = ((bytes + 1) * bitsinbyte * 1000);
-  tmo /= EEPROM_I2C_CLOCK;
-  tmo += 10; /* some additional milliseconds to be safer */
-  return MS2ST(tmo);
-}
-
 /*
  ******************************************************************************
  * EXPORTED FUNCTIONS
@@ -86,10 +68,8 @@ systime_t BusI2C::calc_timeout(size_t bytes) {
 /**
  *
  */
-BusI2C::BusI2C(I2CDriver *i2cp, i2caddr_t addr) :
-i2cp(i2cp),
-addr(addr),
-i2cflags(I2C_NO_ERROR)
+BusSPI::BusSPI(SPIDriver *spip) :
+    spip(spip)
 {
   return;
 }
@@ -97,52 +77,29 @@ i2cflags(I2C_NO_ERROR)
 /**
  *
  */
-msg_t BusI2C::exchange(const BusRequest &req) {
+msg_t BusSPI::exchange(const BusRequest &req) {
 
-#if defined(STM32F1XX_I2C)
-#error "Ugly workaround for single byte reading is not implemented yet"
-  if (1 == len)
-    return stm32_f1x_read_single_byte(data, offset);
-#endif /* defined(STM32F1XX_I2C) */
+#if SPI_USE_MUTUAL_EXCLUSION
+  spiAcquireBus(this->spip);
+#endif
 
-  msg_t status;
-  systime_t tmo = calc_timeout(req.txbytes + req.rxbytes + req.preamble_len);
   if ((nullptr != req.txdata) && (0 != req.txbytes)) {
     uint8_t *tip = &req.writebuf[req.preamble_len];
     memcpy(tip, req.txdata, req.txbytes);
   }
 
-#if I2C_USE_MUTUAL_EXCLUSION
-  i2cAcquireBus(this->i2cp);
+  spiSelect(spip);
+  //spiPolledExchange(spip, frame);
+  spiSend(spip, req.preamble_len + req.txbytes, req.writebuf);
+  if ((nullptr != req.rxdata) && (0 != req.rxbytes))
+    spiReceive(spip, req.rxbytes, req.rxdata);
+  spiUnselect(spip);
+
+#if SPI_USE_MUTUAL_EXCLUSION
+  spiReleaseBus(this->spip);
 #endif
 
-  status = i2cMasterTransmitTimeout(this->i2cp, this->addr,
-      req.writebuf, req.preamble_len + req.txbytes, req.rxdata, req.rxbytes, tmo);
-  if (MSG_OK != status)
-    i2cflags = i2cGetErrors(this->i2cp);
-
-#if I2C_USE_MUTUAL_EXCLUSION
-  i2cReleaseBus(this->i2cp);
-#endif
-
-  return status;
-}
-
-/*
- * Ugly workaround.
- * Stupid I2C cell in STM32F1x does not allow to read single byte.
- * So we must read 2 bytes and return needed one.
- */
-msg_t BusI2C::stm32_f1x_read_single_byte(const uint8_t *txbuf, size_t txbytes,
-                                         uint8_t *rxbuf, systime_t tmo) {
-  uint8_t tmp[2];
-  msg_t status;
-
-  osalSysHalt("Unrealized untested");
-  status = i2cMasterTransmitTimeout(this->i2cp, this->addr,
-                                    txbuf, txbytes, tmp, 2, tmo);
-  rxbuf[0] = tmp[0];
-  return status;
+  return MSG_OK;
 }
 
 } /* namespace */

@@ -127,6 +127,7 @@ protected:
   uint8_t writebuf[MTD_WRITE_BUF_SIZE];
   Bus &bus;
   const MtdConfig &cfg;
+  BusRequest request;
 };
 
 } /* namespace */
