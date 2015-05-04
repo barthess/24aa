@@ -27,42 +27,15 @@
 
 namespace nvram {
 
-struct BusRequest {
-  /**
-   * @brief Convenience function.
-   */
-  void fill(const uint8_t *txdata, size_t txbytes, uint8_t *rxdata,
-                    size_t rxbytes, uint8_t *writebuf, size_t preamble_len) {
-    this->txdata        = txdata;
-    this->txbytes       = txbytes;
-    this->rxdata        = rxdata;
-    this->rxbytes       = rxbytes;
-    this->writebuf      = writebuf;
-    this->preamble_len  = preamble_len;
-  }
-
-  const uint8_t   *txdata = nullptr;
-  size_t          txbytes = 0;
-  uint8_t         *rxdata = nullptr;
-  size_t          rxbytes = 0;
-  /**
-   * @brief   Pointer to working area allocated in higher level.
-   * @details Size of buffer must be enough to store preamble + txdata.
-   * @details Start of buffer my contain some CMD or ADDR data called preamble.
-   */
-  uint8_t         *writebuf = nullptr;
-  /**
-   * @brief   Preamble bytes count written in higher leve. May be 0.
-   */
-  size_t          preamble_len = 0;
-};
-
 /**
  *
  */
 class Bus {
 public:
-  virtual msg_t exchange(const BusRequest &request) = 0;
+  virtual msg_t read(uint8_t *rxbuf, size_t len,
+                     uint8_t *writebuf, size_t preamble_len) = 0;
+  virtual msg_t write(const uint8_t *txdata, size_t len,
+                      uint8_t *writebuf, size_t preamble_len) = 0;
 };
 
 } /* namespace */

@@ -35,7 +35,10 @@ namespace nvram {
 class BusSPI : public Bus {
 public:
   BusSPI(SPIDriver *spip);
-  msg_t exchange(const BusRequest &request);
+  msg_t read(uint8_t *rxbuf, size_t len,
+             uint8_t *writebuf, size_t preamble_len);
+  msg_t write(const uint8_t *txdata, size_t len,
+              uint8_t *writebuf, size_t preamble_len);
 private:
   SPIDriver *spip;
 };

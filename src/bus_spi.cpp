@@ -77,22 +77,19 @@ BusSPI::BusSPI(SPIDriver *spip) :
 /**
  *
  */
-msg_t BusSPI::exchange(const BusRequest &req) {
+msg_t BusSPI::read(uint8_t *rxbuf, size_t len,
+                   uint8_t *writebuf, size_t preamble_len) {
 
 #if SPI_USE_MUTUAL_EXCLUSION
   spiAcquireBus(this->spip);
 #endif
 
-  if ((nullptr != req.txdata) && (0 != req.txbytes)) {
-    uint8_t *tip = &req.writebuf[req.preamble_len];
-    memcpy(tip, req.txdata, req.txbytes);
-  }
+  osalDbgCheck((nullptr != rxbuf) && (0 != len));
 
   spiSelect(spip);
   //spiPolledExchange(spip, frame);
-  spiSend(spip, req.preamble_len + req.txbytes, req.writebuf);
-  if ((nullptr != req.rxdata) && (0 != req.rxbytes))
-    spiReceive(spip, req.rxbytes, req.rxdata);
+  spiSend(spip, preamble_len, writebuf);
+  spiReceive(spip, len, rxbuf);
   spiUnselect(spip);
 
 #if SPI_USE_MUTUAL_EXCLUSION
@@ -102,4 +99,28 @@ msg_t BusSPI::exchange(const BusRequest &req) {
   return MSG_OK;
 }
 
+/**
+ *
+ */
+msg_t BusSPI::write(const uint8_t *txdata, size_t len,
+                    uint8_t *writebuf, size_t preamble_len) {
+
+#if SPI_USE_MUTUAL_EXCLUSION
+  spiAcquireBus(this->spip);
+#endif
+
+  if ((nullptr != txdata) && (0 != len))
+    memcpy(&writebuf[preamble_len], txdata, len);
+
+  spiSelect(spip);
+  //spiPolledExchange(spip, frame);
+  spiSend(spip, preamble_len + len, writebuf);
+  spiUnselect(spip);
+
+#if SPI_USE_MUTUAL_EXCLUSION
+  spiReleaseBus(this->spip);
+#endif
+
+  return MSG_OK;
+}
 } /* namespace */

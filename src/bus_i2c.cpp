@@ -97,27 +97,59 @@ i2cflags(I2C_NO_ERROR)
 /**
  *
  */
-msg_t BusI2C::exchange(const BusRequest &req) {
+msg_t BusI2C::read(uint8_t *rxbuf, size_t len,
+                   uint8_t *writebuf, size_t preamble_len) {
 
 #if defined(STM32F1XX_I2C)
 #error "Ugly workaround for single byte reading is not implemented yet"
   if (1 == len)
-    return stm32_f1x_read_single_byte(data, offset);
+    return stm32_f1x_read_single_byte(rxbuf, offset);
 #endif /* defined(STM32F1XX_I2C) */
 
   msg_t status;
-  systime_t tmo = calc_timeout(req.txbytes + req.rxbytes + req.preamble_len);
-  if ((nullptr != req.txdata) && (0 != req.txbytes)) {
-    uint8_t *tip = &req.writebuf[req.preamble_len];
-    memcpy(tip, req.txdata, req.txbytes);
-  }
+  systime_t tmo = calc_timeout(len + preamble_len);
+  osalDbgCheck((nullptr != rxbuf) && (0 != len));
 
 #if I2C_USE_MUTUAL_EXCLUSION
   i2cAcquireBus(this->i2cp);
 #endif
 
   status = i2cMasterTransmitTimeout(this->i2cp, this->addr,
-      req.writebuf, req.preamble_len + req.txbytes, req.rxdata, req.rxbytes, tmo);
+                    writebuf, preamble_len, rxbuf, len, tmo);
+  if (MSG_OK != status)
+    i2cflags = i2cGetErrors(this->i2cp);
+
+#if I2C_USE_MUTUAL_EXCLUSION
+  i2cReleaseBus(this->i2cp);
+#endif
+
+  return status;
+}
+
+/**
+ *
+ */
+msg_t BusI2C::write(const uint8_t *txdata, size_t len,
+                    uint8_t *writebuf, size_t preamble_len) {
+
+#if defined(STM32F1XX_I2C)
+#error "Ugly workaround for single byte reading is not implemented yet"
+  if (1 == len)
+    return stm32_f1x_read_single_byte(txdata, offset);
+#endif /* defined(STM32F1XX_I2C) */
+
+  msg_t status;
+  systime_t tmo = calc_timeout(len + preamble_len);
+
+  if ((nullptr != txdata) && (0 != len))
+    memcpy(&writebuf[preamble_len], txdata, len);
+
+#if I2C_USE_MUTUAL_EXCLUSION
+  i2cAcquireBus(this->i2cp);
+#endif
+
+  status = i2cMasterTransmitTimeout(this->i2cp, this->addr,
+                  writebuf, preamble_len + len, nullptr, 0, tmo);
   if (MSG_OK != status)
     i2cflags = i2cGetErrors(this->i2cp);
 
