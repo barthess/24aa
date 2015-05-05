@@ -19,25 +19,37 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef NVRAM_BUS_HPP_
-#define NVRAM_BUS_HPP_
+#ifndef MTD25_HPP_
+#define MTD25_HPP_
 
 #include "ch.hpp"
 #include "hal.h"
+
+#include "mtd_conf.h"
+#include "mtd.hpp"
 
 namespace nvram {
 
 /**
  *
  */
-class Bus {
+class Mtd25 : public Mtd {
 public:
-  virtual msg_t read(uint8_t *rxbuf, size_t len,
-                     uint8_t *writebuf, size_t preamble_len) = 0;
-  virtual msg_t write(const uint8_t *txdata, size_t len,
-                      uint8_t *writebuf, size_t preamble_len) = 0;
+  Mtd25(const MtdConfig &cfg, uint8_t *writebuf, size_t writebuf_size, SPIDriver *spip);
+protected:
+  size_t bus_write(const uint8_t *txdata, size_t len, uint32_t offset);
+  size_t bus_read(uint8_t *rxbuf, size_t len, uint32_t offset);
+  msg_t bus_erase(void);
+private:
+  msg_t spi_write_enable(void);
+  msg_t wait_op_complete(systime_t timeout);
+  msg_t spi_read(uint8_t *rxbuf, size_t len,
+                 uint8_t *writebuf, size_t preamble_len);
+  msg_t spi_write(const uint8_t *txdata, size_t len,
+                  uint8_t *writebuf, size_t preamble_len);
+  SPIDriver *spip;
 };
 
 } /* namespace */
 
-#endif /* NVRAM_BUS_HPP_ */
+#endif /* MTD24_HPP_ */

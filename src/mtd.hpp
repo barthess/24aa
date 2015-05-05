@@ -26,32 +26,14 @@
 #include "hal.h"
 
 #include "mtd_conf.h"
-#include "bus.hpp"
 
 #if !defined(MTD_USE_MUTUAL_EXCLUSION)
 #define MTD_USE_MUTUAL_EXCLUSION                FALSE
 #endif
 
-/* The rule of thumb for best performance:
- * 1) for EEPROM set it to size of your IC's page + ADDRESS_BYTES
- * 2) for FRAM there is no such strict rule - chose it from 16..64 */
-#if !defined(MTD_WRITE_BUF_SIZE)
-#error "Buffer size must be defined in mtd_conf.h"
-#endif
-
 namespace nvram {
 
 class Mtd; /* forward declaration */
-
-/**
- *
- */
-enum class NvramType {
-  at24,
-  s25,
-  fm24,
-  fm25
-};
 
 typedef void (*mtdcb_t)(Mtd *mtd);
 
@@ -61,16 +43,17 @@ typedef void (*mtdcb_t)(Mtd *mtd);
 struct MtdConfig {
   /**
    * @brief   Time needed by IC for single page writing.
+   * @note    Set it to 0 for FRAM.
    */
-  systime_t     writetime;
+  systime_t     programtime;
   /**
    * @brief   Size of memory array in pages.
-   * @note    For FRAM set it to 1.
+   * @note    Set it to 1 for FRAM.
    */
   uint32_t      pages;
   /**
    * @brief   Size of single page in bytes.
-   * @note    For FRAM set it to whole array size.
+   * @note    Set it to whole array size for FRAM.
    */
   uint32_t      pagesize;
   /**
@@ -78,18 +61,14 @@ struct MtdConfig {
    */
   size_t        addr_len;
   /**
-   * @brief   Memory type.
-   */
-  NvramType     type;
-  /**
    * @brief   Debug hooks. Set to nullptr if unused.
    */
-  mtdcb_t       start_write;
-  mtdcb_t       stop_write;
-  mtdcb_t       start_read;
-  mtdcb_t       stop_read;
-  mtdcb_t       start_erase;
-  mtdcb_t       stop_erase;
+  mtdcb_t       hook_start_write;
+  mtdcb_t       hook_stop_write;
+  mtdcb_t       hook_start_read;
+  mtdcb_t       hook_stop_read;
+  mtdcb_t       hook_start_erase;
+  mtdcb_t       hook_stop_erase;
 };
 
 /**
@@ -97,26 +76,25 @@ struct MtdConfig {
  */
 class Mtd {
 public:
-  Mtd(Bus &bus, const MtdConfig &cfg);
+  Mtd(const MtdConfig &cfg, uint8_t *writebuf, size_t writebuf_size);
   size_t write(const uint8_t *txdata, size_t len, uint32_t offset);
   size_t read(uint8_t *rxbuf, size_t len, uint32_t offset);
   msg_t erase(void);
   uint32_t capacity(void) {return cfg.pages * cfg.pagesize;}
   uint32_t pagesize(void) {return cfg.pagesize;}
 protected:
-  size_t split_buffer(const uint8_t *txdata, size_t len, uint32_t offset);
-  size_t split_page  (const uint8_t *txdata, size_t len, uint32_t offset);
+  virtual size_t bus_write(const uint8_t *txdata, size_t len, uint32_t offset) = 0;
+  virtual size_t bus_read(uint8_t *rxbuf, size_t len, uint32_t offset) = 0;
+  virtual msg_t bus_erase(void) = 0;
+
+  size_t split_by_buffer(const uint8_t *txdata, size_t len, uint32_t offset);
+  size_t split_by_page  (const uint8_t *txdata, size_t len, uint32_t offset);
   size_t fitted_write(const uint8_t *txdata, size_t len, uint32_t offset);
-  size_t write_type24(const uint8_t *txdata, size_t len, uint32_t offset);
-  size_t write_type25(const uint8_t *txdata, size_t len, uint32_t offset);
-  size_t read_type24(uint8_t *rxbuf, size_t len, size_t uint32_t);
-  size_t read_type25(uint8_t *rxbuf, size_t len, size_t uint32_t);
-  msg_t erase_type24(void);
-  msg_t erase_type25(void);
-  void wait_for_sync(void);
+
   void addr2buf(uint8_t *buf, uint32_t addr, size_t addr_len);
   void acquire(void);
   void release(void);
+
   #if MTD_USE_MUTUAL_EXCLUSION
     #if CH_CFG_USE_MUTEXES
       chibios_rt::Mutex             mutex;
@@ -124,9 +102,10 @@ protected:
       chibios_rt::CounterSemaphore  semaphore;
     #endif
   #endif /* MTD_USE_MUTUAL_EXCLUSION */
-  uint8_t writebuf[MTD_WRITE_BUF_SIZE];
-  Bus &bus;
+
   const MtdConfig &cfg;
+  uint8_t *writebuf;
+  size_t writebuf_size;
 };
 
 } /* namespace */

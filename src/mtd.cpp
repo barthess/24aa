@@ -33,11 +33,6 @@ namespace nvram {
  * DEFINES
  ******************************************************************************
  */
-#define     S25_CMD_READ    0x03
-#define     S25_CMD_4READ   0x13
-#define     S25_CMD_PP      0x02  /* page program */
-#define     S25_CMD_4PP     0x12
-#define     S25_CMD_BE      0x60  /* bulk erase */
 
 /*
  ******************************************************************************
@@ -101,16 +96,6 @@ void Mtd::addr2buf(uint8_t *buf, uint32_t addr, size_t addr_len) {
 /**
  *
  */
-void Mtd::wait_for_sync(void) {
-  if (0 == cfg.writetime)
-    return;
-  else
-    osalThreadSleep(cfg.writetime);
-}
-
-/**
- *
- */
 void Mtd::acquire(void) {
 #if MTD_USE_MUTUAL_EXCLUSION
   #if CH_CFG_USE_MUTEXES
@@ -135,65 +120,6 @@ void Mtd::release(void) {
 }
 
 /**
- * @brief   Accepts data that can be fitted in single page boundary (for EEPROM)
- *          or can be placed in write buffer (for FRAM)
- */
-size_t Mtd::write_type25(const uint8_t *txdata, size_t len, uint32_t offset) {
-  msg_t status;
-
-  osalDbgCheck(sizeof(writebuf) >= cfg.pagesize + cfg.addr_len + 1);
-  osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
-
-  mtd_led_on();
-  this->acquire();
-
-  /* fill preamble */
-  if (4 == cfg.addr_len)
-    writebuf[0] = S25_CMD_4PP;
-  else
-    writebuf[0] = S25_CMD_PP;
-  addr2buf(&writebuf[1], offset, cfg.addr_len);
-
-  status = bus.write(txdata, len, writebuf, 1+cfg.addr_len);
-
-  wait_for_sync();
-  this->release();
-  mtd_led_off();
-
-  if (MSG_OK == status)
-    return len;
-  else
-    return 0;
-}
-
-/**
- * @brief   Accepts data that can be fitted in single page boundary (for EEPROM)
- *          or can be placed in write buffer (for FRAM)
- */
-size_t Mtd::write_type24(const uint8_t *txdata, size_t len, uint32_t offset) {
-  msg_t status;
-
-  osalDbgCheck((sizeof(writebuf) - cfg.addr_len) >= len);
-  osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
-
-  mtd_led_on();
-  this->acquire();
-
-  /* write preamble. Only address bytes for this memory type */
-  addr2buf(writebuf, offset, cfg.addr_len);
-  status = bus.write(txdata, len, writebuf, cfg.addr_len);
-
-  wait_for_sync();
-  this->release();
-  mtd_led_off();
-
-  if (status == MSG_OK)
-    return len;
-  else
-    return 0;
-}
-
-/**
  *
  */
 size_t Mtd::fitted_write(const uint8_t *txdata, size_t len, uint32_t offset) {
@@ -204,25 +130,13 @@ size_t Mtd::fitted_write(const uint8_t *txdata, size_t len, uint32_t offset) {
   osalDbgAssert(((offset / cfg.pagesize) == ((offset + len - 1) / cfg.pagesize)),
              "Data can not be fitted in single page");
 
-  switch (cfg.type) {
-  case NvramType::at24:
-  case NvramType::fm24:
-    return write_type24(txdata, len, offset);
-
-  case NvramType::s25:
-  case NvramType::fm25:
-    return write_type25(txdata, len, offset);
-
-  default:
-    osalSysHalt("Unrealized");
-    return 0;
-  }
+ return bus_write(txdata, len, offset);
 }
 
 /**
- * @brief   Splits big transaction into smaller ones fitted into driver's buffer.
+ * @brief   Splits big transaction into smaller ones fitted into MTD's buffer.
  */
-size_t Mtd::split_buffer(const uint8_t *txdata, size_t len, uint32_t offset) {
+size_t Mtd::split_by_buffer(const uint8_t *txdata, size_t len, uint32_t offset) {
   size_t written = 0;
   size_t tmp;
   const uint32_t blocksize = sizeof(writebuf) - cfg.addr_len;
@@ -255,7 +169,7 @@ EXIT:
 /**
  * @brief   Splits big transaction into smaller ones fitted into memory page.
  */
-size_t Mtd::split_page(const uint8_t *txdata, size_t len, uint32_t offset) {
+size_t Mtd::split_by_page(const uint8_t *txdata, size_t len, uint32_t offset) {
 
   /* bytes to be written at one transaction */
   size_t L = 0;
@@ -304,111 +218,19 @@ EXIT:
   return written;
 }
 
-/**
- *
- */
-size_t Mtd::read_type24(uint8_t *rxbuf, size_t len, size_t offset) {
-  msg_t status;
-
-  osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
-  osalDbgCheck(sizeof(writebuf) >= cfg.addr_len);
-
-  this->acquire();
-  addr2buf(writebuf, offset, cfg.addr_len);
-  status = bus.read(rxbuf, len, writebuf, cfg.addr_len);
-  this->release();
-
-  if (MSG_OK == status)
-    return len;
-  else
-    return 0;
-}
-
-/**
- *
- */
-size_t Mtd::read_type25(uint8_t *rxbuf, size_t len, size_t offset) {
-  msg_t status;
-
-  osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
-  osalDbgCheck(sizeof(writebuf) >= cfg.addr_len + 1);
-
-  this->acquire();
-
-  /* fill preamble */
-  if (4 == cfg.addr_len)
-    writebuf[0] = S25_CMD_4READ;
-  else
-    writebuf[0] = S25_CMD_READ;
-  addr2buf(&writebuf[1], offset, cfg.addr_len);
-
-  status = bus.read(rxbuf, len, writebuf, 1+cfg.addr_len);
-
-  this->release();
-
-  if (MSG_OK == status)
-    return len;
-  else
-    return 0;
-}
-
-/**
- *
- */
-msg_t Mtd::erase_type24(void) {
-  msg_t status;
-
-  mtd_led_on();
-  this->acquire();
-
-  size_t blocksize = (sizeof(writebuf) - cfg.addr_len);
-  size_t total_writes = capacity() / blocksize;
-
-  memset(writebuf, 0xFF, sizeof(writebuf));
-  status = MSG_RESET;
-  for (size_t i=0; i<total_writes; i++) {
-    addr2buf(writebuf, i * blocksize, cfg.addr_len);
-    status = bus.write(nullptr, 0, writebuf, sizeof(writebuf));
-    wait_for_sync();
-    if (MSG_OK != status)
-      break;
-  }
-
-  this->release();
-  mtd_led_off();
-  return status;
-}
-
-/**
- *
- */
-msg_t Mtd::erase_type25(void) {
-
-  mtd_led_on();
-  this->acquire();
-
-  writebuf[0] = S25_CMD_BE;
-  bus.write(nullptr, 0, writebuf, 1);
-
-  osalSysHalt("Wait erase completeness unrealized yet");
-
-  this->release();
-  mtd_led_off();
-  return MSG_OK;
-}
-
 /*
  ******************************************************************************
  * EXPORTED FUNCTIONS
  ******************************************************************************
  */
 
-/**
- *
- */
-Mtd::Mtd(Bus &bus, const MtdConfig &cfg) :
-bus(bus),
-cfg(cfg)
+/* The rule of thumb for best performance write buffer:
+ * 1) for EEPROM set it to size of your IC's page + ADDRESS_BYTES + command bytes
+ * 2) for FRAM there is no such strict rule - chose it from 16..64 */
+Mtd::Mtd(const MtdConfig &cfg, uint8_t *writebuf, size_t writebuf_size) :
+cfg(cfg),
+writebuf(writebuf),
+writebuf_size(writebuf_size)
 #if (MTD_USE_MUTUAL_EXCLUSION && !CH_CFG_USE_MUTEXES)
   ,semaphore(1)
 #endif
@@ -420,40 +242,56 @@ cfg(cfg)
  *
  */
 size_t Mtd::write(const uint8_t *data, size_t len, uint32_t offset) {
+  size_t ret;
 
-  switch(cfg.type) {
-  case NvramType::at24:
-  case NvramType::s25:
-    return split_page(data, len, offset);
+  if (nullptr != cfg.hook_start_write)
+    cfg.hook_start_write(this);
 
-  case NvramType::fm24:
-  case NvramType::fm25:
-    return split_buffer(data, len, offset);
-
-  default:
-    osalSysHalt("Unrealized");
-    return 0;
+  if (1 == cfg.pages) { /* FRAM */
+    ret = split_by_buffer(data, len, offset);
   }
+  else {  /* page organized EEPROM */
+    ret = split_by_page(data, len, offset);
+  }
+
+  if (nullptr != cfg.hook_stop_write)
+    cfg.hook_stop_write(this);
+
+  return ret;
 }
 
 /**
  *
  */
 size_t Mtd::read(uint8_t *rxbuf, size_t len, uint32_t offset) {
+  size_t ret;
 
-  switch(cfg.type) {
-  case NvramType::at24:
-  case NvramType::fm24:
-    return read_type24(rxbuf, len, offset);
+  if (nullptr != cfg.hook_start_read)
+    cfg.hook_start_read(this);
 
-  case NvramType::s25:
-  case NvramType::fm25:
-    return read_type25(rxbuf, len, offset);
+  ret = bus_read(rxbuf, len, offset);
 
-  default:
-    osalSysHalt("Unrealized");
-    return 0;
-  }
+  if (nullptr != cfg.hook_stop_read)
+    cfg.hook_stop_read(this);
+
+  return ret;
+}
+
+/**
+ *
+ */
+msg_t Mtd::erase(void) {
+  size_t ret;
+
+  if (nullptr != cfg.hook_start_erase)
+    cfg.hook_start_erase(this);
+
+  ret = bus_erase();
+
+  if (nullptr != cfg.hook_stop_erase)
+    cfg.hook_stop_erase(this);
+
+  return ret;
 }
 
 } /* namespace */

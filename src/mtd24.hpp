@@ -19,35 +19,42 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef NVRAM_BUS_I2C_HPP_
-#define NVRAM_BUS_I2C_HPP_
+#ifndef MTD24_HPP_
+#define MTD24_HPP_
 
 #include "ch.hpp"
 #include "hal.h"
 
-#include "bus.hpp"
+#include "mtd_conf.h"
+#include "mtd.hpp"
 
 namespace nvram {
 
 /**
  *
  */
-class BusI2C : public Bus {
+class Mtd24 : public Mtd {
 public:
-  BusI2C(I2CDriver *i2cp, i2caddr_t addr);
-  msg_t read(uint8_t *rxbuf, size_t len,
-             uint8_t *writebuf, size_t preamble_len);
-  msg_t write(const uint8_t *txdata, size_t len,
-              uint8_t *writebuf, size_t preamble_len);
+  Mtd24(const MtdConfig &cfg, uint8_t *writebuf, size_t writebuf_size,
+                                      I2CDriver *i2cp, i2caddr_t addr);
+protected:
+  size_t bus_write(const uint8_t *txdata, size_t len, uint32_t offset);
+  size_t bus_read(uint8_t *rxbuf, size_t len, uint32_t offset);
+  msg_t bus_erase(void);
 private:
-  msg_t stm32_f1x_read_single_byte(const uint8_t *txbuf, size_t txbytes,
-                                         uint8_t *rxbuf, systime_t tmo);
+  void wait_op_complete(void);
+  msg_t i2c_read(uint8_t *rxbuf, size_t len,
+                 uint8_t *writebuf, size_t preamble_len);
+  msg_t i2c_write(const uint8_t *txdata, size_t len,
+                  uint8_t *writebuf, size_t preamble_len);
   systime_t calc_timeout(size_t bytes);
+  msg_t stm32_f1x_read_single_byte(const uint8_t *txbuf, size_t txbytes,
+                                   uint8_t *rxbuf, systime_t tmo);
   I2CDriver *i2cp;
   i2caddr_t addr;
-  i2cflags_t i2cflags;
+  i2cflags_t i2cflags = 0;
 };
 
 } /* namespace */
 
-#endif /* NVRAM_BUS_HPP_ */
+#endif /* MTD24_HPP_ */

@@ -24,7 +24,7 @@
 
 #include "ch.hpp"
 
-#include "bus_i2c.hpp"
+#include "mtd24.hpp"
 
 namespace nvram {
 
@@ -38,7 +38,6 @@ namespace nvram {
 #else
 #define EEPROM_I2C_CLOCK (this->i2cp->config->clock_speed)
 #endif
-
 /*
  ******************************************************************************
  * EXTERNS
@@ -64,11 +63,10 @@ namespace nvram {
  ******************************************************************************
  ******************************************************************************
  */
-
 /**
  * @brief     Calculates requred timeout.
  */
-systime_t BusI2C::calc_timeout(size_t bytes) {
+systime_t Mtd24::calc_timeout(size_t bytes) {
   const uint32_t bitsinbyte = 10;
   uint32_t tmo;
   tmo = ((bytes + 1) * bitsinbyte * 1000);
@@ -77,27 +75,10 @@ systime_t BusI2C::calc_timeout(size_t bytes) {
   return MS2ST(tmo);
 }
 
-/*
- ******************************************************************************
- * EXPORTED FUNCTIONS
- ******************************************************************************
- */
-
 /**
  *
  */
-BusI2C::BusI2C(I2CDriver *i2cp, i2caddr_t addr) :
-i2cp(i2cp),
-addr(addr),
-i2cflags(I2C_NO_ERROR)
-{
-  return;
-}
-
-/**
- *
- */
-msg_t BusI2C::read(uint8_t *rxbuf, size_t len,
+msg_t Mtd24::i2c_read(uint8_t *rxbuf, size_t len,
                    uint8_t *writebuf, size_t preamble_len) {
 
 #if defined(STM32F1XX_I2C)
@@ -129,8 +110,8 @@ msg_t BusI2C::read(uint8_t *rxbuf, size_t len,
 /**
  *
  */
-msg_t BusI2C::write(const uint8_t *txdata, size_t len,
-                    uint8_t *writebuf, size_t preamble_len) {
+msg_t Mtd24::i2c_write(const uint8_t *txdata, size_t len,
+                      uint8_t *writebuf, size_t preamble_len) {
 
 #if defined(STM32F1XX_I2C)
 #error "Ugly workaround for single byte reading is not implemented yet"
@@ -160,12 +141,22 @@ msg_t BusI2C::write(const uint8_t *txdata, size_t len,
   return status;
 }
 
+/**
+ *
+ */
+void Mtd24::wait_op_complete(void) {
+  if (0 == cfg.programtime)
+    return;
+  else
+    osalThreadSleep(cfg.programtime);
+}
+
 /*
  * Ugly workaround.
  * Stupid I2C cell in STM32F1x does not allow to read single byte.
  * So we must read 2 bytes and return needed one.
  */
-msg_t BusI2C::stm32_f1x_read_single_byte(const uint8_t *txbuf, size_t txbytes,
+msg_t Mtd24::stm32_f1x_read_single_byte(const uint8_t *txbuf, size_t txbytes,
                                          uint8_t *rxbuf, systime_t tmo) {
   uint8_t tmp[2];
   msg_t status;
@@ -175,6 +166,97 @@ msg_t BusI2C::stm32_f1x_read_single_byte(const uint8_t *txbuf, size_t txbytes,
                                     txbuf, txbytes, tmp, 2, tmo);
   rxbuf[0] = tmp[0];
   return status;
+}
+
+/**
+ * @brief   Accepts data that can be fitted in single page boundary (for EEPROM)
+ *          or can be placed in write buffer (for FRAM)
+ */
+size_t Mtd24::bus_write(const uint8_t *txdata, size_t len, uint32_t offset) {
+  msg_t status;
+
+  osalDbgCheck((sizeof(writebuf) - cfg.addr_len) >= len);
+  osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
+
+  this->acquire();
+
+  /* write preamble. Only address bytes for this memory type */
+  addr2buf(writebuf, offset, cfg.addr_len);
+  status = i2c_write(txdata, len, writebuf, cfg.addr_len);
+
+  wait_op_complete();
+  this->release();
+
+  if (status == MSG_OK)
+    return len;
+  else
+    return 0;
+}
+
+/**
+ *
+ */
+size_t Mtd24::bus_read(uint8_t *rxbuf, size_t len, uint32_t offset) {
+  msg_t status;
+
+  osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
+  osalDbgCheck(sizeof(writebuf) >= cfg.addr_len);
+
+  this->acquire();
+  addr2buf(writebuf, offset, cfg.addr_len);
+  status = i2c_read(rxbuf, len, writebuf, cfg.addr_len);
+  this->release();
+
+  if (MSG_OK == status)
+    return len;
+  else
+    return 0;
+}
+
+/**
+ *
+ */
+msg_t Mtd24::bus_erase(void) {
+  msg_t status;
+
+  this->acquire();
+
+  size_t blocksize = (sizeof(writebuf) - cfg.addr_len);
+  size_t total_writes = capacity() / blocksize;
+
+  osalDbgAssert(0 == (capacity() % blocksize),
+      "Capacity must be divided by block size without remainder");
+
+  memset(writebuf, 0xFF, writebuf_size);
+  status = MSG_RESET;
+  for (size_t i=0; i<total_writes; i++) {
+    addr2buf(writebuf, i * blocksize, cfg.addr_len);
+    status = i2c_write(nullptr, 0, writebuf, sizeof(writebuf));
+    wait_op_complete();
+    if (MSG_OK != status)
+      break;
+  }
+
+  this->release();
+  return status;
+}
+
+/*
+ ******************************************************************************
+ * EXPORTED FUNCTIONS
+ ******************************************************************************
+ */
+
+/**
+ *
+ */
+Mtd24::Mtd24(const MtdConfig &cfg, uint8_t *writebuf, size_t writebuf_size,
+                                            I2CDriver *i2cp, i2caddr_t addr) :
+Mtd(cfg, writebuf,  writebuf_size),
+i2cp(i2cp),
+addr(addr)
+{
+  return;
 }
 
 } /* namespace */
