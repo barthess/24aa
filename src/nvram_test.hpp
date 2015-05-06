@@ -19,9 +19,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef TEST_NVRAM_HPP_
-#define TEST_NVRAM_HPP_
+#ifndef NVRAM_TEST_HPP_
+#define NVRAM_TEST_HPP_
 
-void testNvram(void);
+void testNvram(Mtd *mtd);
 
-#endif /* TEST_NVRAM_HPP_ */
+#endif /* NVRAM_TEST_HPP_ */

@@ -24,6 +24,8 @@
 #include "ch.hpp"
 #include "hal.h"
 
+#include "nvram_fs.hpp"
+
 /* use this switch to build FRAM test instead of EEPROM */
 #define USE_FRAM_TEST     FALSE
 
@@ -33,7 +35,6 @@
   #include "eeprom_mtd.hpp"
 #endif
 
-#include "nvram_fs.hpp"
 
 /*
  ******************************************************************************
