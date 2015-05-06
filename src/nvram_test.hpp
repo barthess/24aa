@@ -22,6 +22,8 @@
 #ifndef NVRAM_TEST_HPP_
 #define NVRAM_TEST_HPP_
 
-void testNvram(Mtd *mtd);
+#include "mtd.hpp"
+
+void nvramTest(nvram::Mtd &mtd);
 
 #endif /* NVRAM_TEST_HPP_ */

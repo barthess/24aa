@@ -82,6 +82,7 @@ public:
   msg_t erase(void);
   uint32_t capacity(void) {return cfg.pages * cfg.pagesize;}
   uint32_t pagesize(void) {return cfg.pagesize;}
+  uint32_t pagecount(void) {return cfg.pages;}
 protected:
   virtual size_t bus_write(const uint8_t *txdata, size_t len, uint32_t offset) = 0;
   virtual size_t bus_read(uint8_t *rxbuf, size_t len, uint32_t offset) = 0;
