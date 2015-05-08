@@ -357,13 +357,6 @@ static void fullwrite_erase(Mtd &mtd) {
   chTMObjectInit(&tm_full_write);
   chTMObjectInit(&tm_full_read);
 
-  /* erase all */
-  chTMStartMeasurementX(&tm_mass_erase);
-  status = mtd.erase();
-  chTMStopMeasurementX(&tm_mass_erase);
-  osalDbgCheck(MSG_OK == status);
-  check_erased(mtd);
-
   /* fill with random data */
   srand(seed);
   offset = 0;

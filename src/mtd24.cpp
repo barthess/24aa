@@ -175,7 +175,7 @@ msg_t Mtd24::stm32_f1x_read_single_byte(const uint8_t *txbuf, size_t txbytes,
 size_t Mtd24::bus_write(const uint8_t *txdata, size_t len, uint32_t offset) {
   msg_t status;
 
-  osalDbgCheck((sizeof(writebuf) - cfg.addr_len) >= len);
+  osalDbgCheck((this->writebuf_size - cfg.addr_len) >= len);
   osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
 
   this->acquire();
@@ -200,7 +200,7 @@ size_t Mtd24::bus_read(uint8_t *rxbuf, size_t len, uint32_t offset) {
   msg_t status;
 
   osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
-  osalDbgCheck(sizeof(writebuf) >= cfg.addr_len);
+  osalDbgCheck(this->writebuf_size >= cfg.addr_len);
 
   this->acquire();
   addr2buf(writebuf, offset, cfg.addr_len);
@@ -221,7 +221,7 @@ msg_t Mtd24::bus_erase(void) {
 
   this->acquire();
 
-  size_t blocksize = (sizeof(writebuf) - cfg.addr_len);
+  size_t blocksize = (this->writebuf_size - cfg.addr_len);
   size_t total_writes = capacity() / blocksize;
 
   osalDbgAssert(0 == (capacity() % blocksize),
@@ -231,7 +231,7 @@ msg_t Mtd24::bus_erase(void) {
   status = MSG_RESET;
   for (size_t i=0; i<total_writes; i++) {
     addr2buf(writebuf, i * blocksize, cfg.addr_len);
-    status = i2c_write(nullptr, 0, writebuf, sizeof(writebuf));
+    status = i2c_write(nullptr, 0, writebuf, this->writebuf_size);
     wait_op_complete();
     if (MSG_OK != status)
       break;

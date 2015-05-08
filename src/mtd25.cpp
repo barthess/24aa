@@ -41,6 +41,7 @@ namespace nvram {
 #define     S25_CMD_RDSR1   0x05  // Read Status Register-1
 #define     S25_CMD_RDSR2   0x07  // Read Status Register-2
 #define     S25_CMD_RDCR    0x35  // Read Configuration Register-1
+#define     S25_CMD_RDID    0x9F  // Read ID
 #define     S25_CMD_WRR     0x01  // Write Register (Status-1, Configuration-1)
 #define     S25_CMD_WRDI    0x04  // Write Disable
 #define     S25_CMD_WREN    0x06  // Write Enable
@@ -122,9 +123,10 @@ msg_t Mtd25::spi_write_enable(void) {
   spiPolledExchange(spip, S25_CMD_RDSR1);
   tmp = spiPolledExchange(spip, 0);
   spiUnselect(spip);
-  if (!(tmp & S25_SR1_WEL)) {
+  if (tmp & S25_SR1_WEL)
+    ret = MSG_OK;
+  else
     ret = MSG_RESET;
-  }
 
 #if SPI_USE_MUTUAL_EXCLUSION
   spiReleaseBus(this->spip);
@@ -139,7 +141,6 @@ msg_t Mtd25::spi_write_enable(void) {
 msg_t Mtd25::spi_write(const uint8_t *txdata, size_t len,
                        uint8_t *writebuf, size_t preamble_len) {
 
-  osalDbgCheck((nullptr != txdata) && (0 != len));
   memcpy(&writebuf[preamble_len], txdata, len);
 
   if (MSG_OK != spi_write_enable())
@@ -168,23 +169,23 @@ msg_t Mtd25::wait_op_complete(systime_t timeout) {
   systime_t start = chVTGetSystemTimeX();
   systime_t end = start + timeout;
 
-  osalThreadSleepMilliseconds(1);
+  osalThreadSleepMilliseconds(2);
 
   while (chVTIsSystemTimeWithinX(start, end)) {
     uint8_t tmp;
 
-    #if SPI_USE_MUTUAL_EXCLUSION
+#if SPI_USE_MUTUAL_EXCLUSION
     spiAcquireBus(this->spip);
-    #endif
+#endif
 
     spiSelect(spip);
     spiPolledExchange(spip, S25_CMD_RDSR1);
     tmp = spiPolledExchange(spip, 0);
     spiUnselect(spip);
 
-    #if SPI_USE_MUTUAL_EXCLUSION
+#if SPI_USE_MUTUAL_EXCLUSION
     spiReleaseBus(this->spip);
-    #endif
+#endif
 
     if (tmp & S25_SR1_WIP) {
       continue;
@@ -210,7 +211,7 @@ msg_t Mtd25::wait_op_complete(systime_t timeout) {
 size_t Mtd25::bus_write(const uint8_t *txdata, size_t len, uint32_t offset) {
   msg_t status;
 
-  osalDbgCheck(sizeof(writebuf) >= cfg.pagesize + cfg.addr_len + 1);
+  osalDbgCheck(this->writebuf_size >= cfg.pagesize + cfg.addr_len + 1);
   osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
 
   this->acquire();
@@ -239,7 +240,7 @@ size_t Mtd25::bus_read(uint8_t *rxbuf, size_t len, uint32_t offset) {
   msg_t status;
 
   osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
-  osalDbgCheck(sizeof(writebuf) >= cfg.addr_len + 1);
+  osalDbgCheck(this->writebuf_size >= cfg.addr_len + 1);
 
   this->acquire();
 
@@ -264,16 +265,17 @@ size_t Mtd25::bus_read(uint8_t *rxbuf, size_t len, uint32_t offset) {
  *
  */
 msg_t Mtd25::bus_erase(void) {
+  msg_t ret;
 
   this->acquire();
 
   writebuf[0] = S25_CMD_BE;
   spi_write(nullptr, 0, writebuf, 1);
-
-  osalSysHalt("Wait erase completeness unrealized yet");
+  ret = wait_op_complete(cfg.erasetime);
 
   this->release();
-  return MSG_OK;
+
+  return ret;
 }
 
 /*

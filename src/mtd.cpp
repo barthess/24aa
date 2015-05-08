@@ -139,7 +139,7 @@ size_t Mtd::fitted_write(const uint8_t *txdata, size_t len, uint32_t offset) {
 size_t Mtd::split_by_buffer(const uint8_t *txdata, size_t len, uint32_t offset) {
   size_t written = 0;
   size_t tmp;
-  const uint32_t blocksize = sizeof(writebuf) - cfg.addr_len;
+  const uint32_t blocksize = this->writebuf_size - cfg.addr_len;
   const uint32_t big_writes = len / blocksize;
   const uint32_t small_write_size = len % blocksize;
 
@@ -175,6 +175,7 @@ size_t Mtd::split_by_page(const uint8_t *txdata, size_t len, uint32_t offset) {
   size_t L = 0;
   /* total bytes successfully written */
   size_t written = 0;
+  size_t ret = 0;
   /* cached value */
   const uint32_t pagesize = cfg.pagesize;
   /* first page to be affected during transaction */
@@ -185,7 +186,7 @@ size_t Mtd::split_by_page(const uint8_t *txdata, size_t len, uint32_t offset) {
   /* data fits in single page */
   if (firstpage == lastpage) {
     L = len;
-    written += fitted_write(txdata, L, offset);
+    written = fitted_write(txdata, L, offset);
     txdata += L;
     offset += L;
     goto EXIT;
@@ -193,14 +194,22 @@ size_t Mtd::split_by_page(const uint8_t *txdata, size_t len, uint32_t offset) {
   else{
     /* write first piece of data to the first page boundary */
     L = firstpage * pagesize + pagesize - offset;
-    written += fitted_write(txdata, L, offset);
+    ret = fitted_write(txdata, L, offset);
+    if (ret != L)
+      goto EXIT;
+    else
+      written += ret;
     txdata += L;
     offset += L;
 
     /* now writes blocks at a size of pages (may be no one) */
     L = pagesize;
     while ((len - written) > pagesize){
-      written += fitted_write(txdata, L, offset);
+      ret = fitted_write(txdata, L, offset);
+      if (ret != L)
+        goto EXIT;
+      else
+        written += ret;
       txdata += L;
       offset += L;
     }

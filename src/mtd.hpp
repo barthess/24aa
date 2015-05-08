@@ -42,10 +42,15 @@ typedef void (*mtdcb_t)(Mtd *mtd);
  */
 struct MtdConfig {
   /**
-   * @brief   Time needed by IC for single page writing.
+   * @brief   Time needed (worst case) by IC for single page writing.
    * @note    Set it to 0 for FRAM.
    */
   systime_t     programtime;
+  /**
+   * @brief   Time needed (worst case) by IC for full erase.
+   * @note    Set it to 0 for FRAM or for memory without hardware erase.
+   */
+  systime_t     erasetime;
   /**
    * @brief   Size of memory array in pages.
    * @note    Set it to 1 for FRAM.
