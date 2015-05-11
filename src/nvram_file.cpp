@@ -91,7 +91,9 @@ uint32_t File::getAndClearLastError(void){
 /**
  *
  */
-File::File(void) {
+File::File(void) :
+mtd(nullptr), start(0), size(0), tip(0)
+{
   return;
 }
 

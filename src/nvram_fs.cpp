@@ -343,7 +343,7 @@ bool Fs::fsck(void) {
   mtd.read(dbg_super, sizeof(dbg_super), 0);
 
   /* open superblock */
-  osalDbgCheck((this->files_opened == 0) && (NULL == super.mtd));
+  osalDbgCheck((this->files_opened == 0) && (nullptr == super.mtd));
   open_super();
 
   /* check magic */
