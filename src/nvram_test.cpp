@@ -28,6 +28,7 @@
 #include "hal.h"
 
 #include "nvram_file.hpp"
+#include "nvram_fs.hpp"
 
 using namespace nvram;
 
@@ -238,10 +239,17 @@ static void __file_addres_translate_test(Mtd &mtd, size_t writesize) {
 /*
  *
  */
-static void file_addres_translate_test(Mtd &mtd) {
-  __file_addres_translate_test(mtd, mtd.pagesize());
-  __file_addres_translate_test(mtd, mtd.pagesize() - 1);
-  __file_addres_translate_test(mtd, mtd.pagesize() + 1);
+static void addres_translate_test(Mtd &mtd) {
+  uint32_t writesize;
+
+  if (mtd.pagecount() > 1)
+    writesize = mtd.pagesize();
+  else
+    writesize = 64;
+
+  __file_addres_translate_test(mtd, writesize);
+  __file_addres_translate_test(mtd, writesize - 1);
+  __file_addres_translate_test(mtd, writesize + 1);
 }
 
 /*
@@ -398,25 +406,93 @@ static void full_write_erase(Mtd &mtd) {
 }
 
 /*
+ *
+ */
+static void file_put_test(Mtd &mtd) {
+  nvram::File f;
+  f.__test_ctor(&mtd, 0, mtd.capacity());
+  file_test(&f);
+}
+
+/*
  ******************************************************************************
  * EXPORTED FUNCTIONS
  ******************************************************************************
  */
 
-/**
+/*
  *
  */
 void nvramTestSuite(Mtd &mtd) {
+  size_t df, df2;
+  size_t status;
+  File *test0, *test1, *test2, *test3;
 
   full_write_erase(mtd);
 
   if (mtd.pagecount() > 1) {
     eeprom_write_align_check(mtd);
+    eeprom_write_misalign_check(mtd);
   }
 
+  addres_translate_test(mtd);
+
+  file_put_test(mtd);
+
+  mtd.erase();
+  Fs nvfs(mtd);
+  osalDbgCheck(OSAL_FAILED  == nvfs.mount());
+  osalDbgCheck(OSAL_FAILED  == nvfs.fsck());
+  osalDbgCheck(OSAL_SUCCESS == nvfs.mkfs());
+  osalDbgCheck(OSAL_SUCCESS == nvfs.fsck());
+  osalDbgCheck(OSAL_SUCCESS == nvfs.mount());
+
+  df = nvfs.df();
+  test0 = nvfs.create("test0", 1024);
+  osalDbgCheck(NULL != test0);
+  df2 = nvfs.df();
+  osalDbgCheck(df2 == (df - 1024));
+  memset(mtdbuf, 0x55, sizeof(mtdbuf));
+  status = mtd.read(mtdbuf, sizeof(mtdbuf), 0);
+  osalDbgCheck(sizeof(mtdbuf) == status);
+  file_test(test0);
+  memset(mtdbuf, 0x55, sizeof(mtdbuf));
+  status = mtd.read(mtdbuf, sizeof(mtdbuf), 0);
+  osalDbgCheck(sizeof(mtdbuf) == status);
+  nvfs.close(test0);
+  test0 = nvfs.open("test0");
+  osalDbgCheck(NULL != test0);
+  nvfs.close(test0);
+  test0 = nvfs.create("test0", 1024);
+  osalDbgCheck(NULL == test0);
+
+  test1 = nvfs.create("test1", 32);
+  osalDbgCheck(NULL != test1);
+  df2 = nvfs.df();
+  osalDbgCheck(df2 == (df - 1024 - 32));
+
+  test2 = nvfs.create("test2", 32);
+  osalDbgCheck(NULL != test2);
+  df2 = nvfs.df();
+  osalDbgCheck(df2 == (df - 1024 - 32 - 32));
+
+  test3 = nvfs.create("test3", 32);
+  osalDbgCheck(NULL == test3);
+
+  file_test(test1);
+  file_test(test2);
+
+  nvfs.close(test1);
+  nvfs.close(test2);
+
+  osalDbgCheck(OSAL_SUCCESS == nvfs.umount());
+  osalDbgCheck(OSAL_SUCCESS == nvfs.fsck());
+
+  /*  now just read all data from NVRAM for eye check */
+  memset(mtdbuf, 0x55, sizeof(mtdbuf));
+  status = mtd.read(mtdbuf, sizeof(mtdbuf), 0);
+  osalDbgCheck(sizeof(mtdbuf) == status);
 }
-
-
 
 
 
