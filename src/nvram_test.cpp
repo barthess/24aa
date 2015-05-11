@@ -59,10 +59,6 @@ static uint8_t mtdbuf[TEST_BUF_LEN];
 static uint8_t refbuf[TEST_BUF_LEN];
 static uint8_t filebuf[TEST_BUF_LEN];
 
-static time_measurement_t tm_mass_erase;
-static time_measurement_t tm_full_write;
-static time_measurement_t tm_full_read;
-
 /*
  ******************************************************************************
  ******************************************************************************
@@ -70,53 +66,11 @@ static time_measurement_t tm_full_read;
  ******************************************************************************
  ******************************************************************************
  */
-/*
- *
- */
-static void __eeprom_write_align_check(Mtd &mtd, uint8_t pattern, size_t pagenum) {
-  size_t offset = mtd.pagesize() * pagenum;
-  msg_t status = MSG_RESET;
-
-  memset(refbuf, pattern, sizeof(refbuf));
-
-  status = mtd.write(refbuf, mtd.pagesize(), offset);
-  osalDbgCheck(MSG_OK == status);
-  status = mtd.read(mtdbuf, mtd.pagesize(), offset);
-  osalDbgCheck(MSG_OK == status);
-
-  osalDbgCheck(0 == memcmp(refbuf, mtdbuf, mtd.pagesize()));
-}
 
 /*
  *
  */
-static void write_align_check(Mtd &mtd) {
-
-  __eeprom_write_align_check(mtd, 0x00, 0);
-  __eeprom_write_align_check(mtd, 0x55, 0);
-  __eeprom_write_align_check(mtd, 0xAA, 0);
-  __eeprom_write_align_check(mtd, 0xFF, 0);
-
-  __eeprom_write_align_check(mtd, 0x00, 1);
-  __eeprom_write_align_check(mtd, 0x55, 1);
-  __eeprom_write_align_check(mtd, 0xAA, 1);
-  __eeprom_write_align_check(mtd, 0xFF, 1);
-
-  __eeprom_write_align_check(mtd, 0x00, mtd.pagecount() - 1);
-  __eeprom_write_align_check(mtd, 0x55, mtd.pagecount() - 1);
-  __eeprom_write_align_check(mtd, 0xAA, mtd.pagecount() - 1);
-  __eeprom_write_align_check(mtd, 0xFF, mtd.pagecount() - 1);
-
-  __eeprom_write_align_check(mtd, 0x00, mtd.pagecount() - 2);
-  __eeprom_write_align_check(mtd, 0x55, mtd.pagecount() - 2);
-  __eeprom_write_align_check(mtd, 0xAA, mtd.pagecount() - 2);
-  __eeprom_write_align_check(mtd, 0xFF, mtd.pagecount() - 2);
-}
-
-/*
- *
- */
-static void __eeprom_write_check(Mtd &mtd, uint8_t pattern, size_t offset, size_t len) {
+static void __eeprom_write_misalign_check(Mtd &mtd, uint8_t pattern, size_t offset, size_t len) {
   msg_t status = MSG_RESET;
 
   memset(refbuf, ~pattern, sizeof(refbuf));
@@ -151,70 +105,70 @@ static void eeprom_write_misalign_check(Mtd &mtd) {
 
   len = mtd.pagesize() + 1;
   offset = 0;
-  __eeprom_write_check(mtd, 0x17, offset + 0, len);
-  __eeprom_write_check(mtd, 0x17, offset + 1, len);
-  __eeprom_write_check(mtd, 0x17, offset + 2, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 0, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 1, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 2, len);
   offset = mtd.pagesize();
-  __eeprom_write_check(mtd, 0x17, offset - 2, len);
-  __eeprom_write_check(mtd, 0x17, offset - 1, len);
-  __eeprom_write_check(mtd, 0x17, offset + 0, len);
-  __eeprom_write_check(mtd, 0x17, offset + 1, len);
-  __eeprom_write_check(mtd, 0x17, offset + 2, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset - 2, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset - 1, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 0, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 1, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 2, len);
   offset = (mtd.pagecount() - 1) * mtd.pagesize();
-  //__eeprom_write_check(mtd, 0x17, offset - 0, len); /* here mtd MUST crash because of overflow */
-  __eeprom_write_check(mtd, 0x17, offset - 1, len);
-  __eeprom_write_check(mtd, 0x17, offset - 2, len);
+  //__eeprom_write_misalign_check(mtd, 0x17, offset - 0, len); /* here mtd MUST crash because of overflow */
+  __eeprom_write_misalign_check(mtd, 0x17, offset - 1, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset - 2, len);
 
   len = mtd.pagesize() + 2;
   offset = 0;
-  __eeprom_write_check(mtd, 0x17, offset + 0, len);
-  __eeprom_write_check(mtd, 0x17, offset + 1, len);
-  __eeprom_write_check(mtd, 0x17, offset + 2, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 0, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 1, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 2, len);
   offset = mtd.pagesize();
-  __eeprom_write_check(mtd, 0x17, offset - 3, len);
-  __eeprom_write_check(mtd, 0x17, offset - 2, len);
-  __eeprom_write_check(mtd, 0x17, offset - 1, len);
-  __eeprom_write_check(mtd, 0x17, offset + 0, len);
-  __eeprom_write_check(mtd, 0x17, offset + 1, len);
-  __eeprom_write_check(mtd, 0x17, offset + 2, len);
-  __eeprom_write_check(mtd, 0x17, offset + 3, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset - 3, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset - 2, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset - 1, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 0, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 1, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 2, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 3, len);
   offset = (mtd.pagecount() - 1) * mtd.pagesize();
-  //__eeprom_write_check(mtd, 0x17, offset - 0, len); /* here mtd MUST crash because of overflow */
-  //__eeprom_write_check(mtd, 0x17, offset - 1, len);
-  __eeprom_write_check(mtd, 0x17, offset - 2, len);
-  __eeprom_write_check(mtd, 0x17, offset - 3, len);
+  //__eeprom_write_misalign_check(mtd, 0x17, offset - 0, len); /* here mtd MUST crash because of overflow */
+  //__eeprom_write_misalign_check(mtd, 0x17, offset - 1, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset - 2, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset - 3, len);
 
   len = mtd.pagesize() * 2 + 1;
   offset = 0;
-  __eeprom_write_check(mtd, 0x17, offset + 0, len);
-  __eeprom_write_check(mtd, 0x17, offset + 1, len);
-  __eeprom_write_check(mtd, 0x17, offset + 2, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 0, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 1, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 2, len);
   offset = (mtd.pagecount() - 2) * mtd.pagesize();
-  //__eeprom_write_check(mtd, 0x17, offset - 0, len); /* here mtd MUST crash because of overflow */
-  __eeprom_write_check(mtd, 0x17, offset - 1, len);
-  __eeprom_write_check(mtd, 0x17, offset - 2, len);
+  //__eeprom_write_misalign_check(mtd, 0x17, offset - 0, len); /* here mtd MUST crash because of overflow */
+  __eeprom_write_misalign_check(mtd, 0x17, offset - 1, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset - 2, len);
 
   len = mtd.pagesize() - 1;
   offset = 0;
-  __eeprom_write_check(mtd, 0x17, offset + 0, len);
-  __eeprom_write_check(mtd, 0x17, offset + 1, len);
-  __eeprom_write_check(mtd, 0x17, offset + 2, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 0, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 1, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 2, len);
   offset = (mtd.pagecount() - 1) * mtd.pagesize();
-  //__eeprom_write_check(mtd, 0x17, offset + 2, len); /* here mtd MUST crash because of overflow */
-  __eeprom_write_check(mtd, 0x17, offset + 1, len);
-  __eeprom_write_check(mtd, 0x17, offset + 0, len);
-  __eeprom_write_check(mtd, 0x17, offset - 1, len);
+  //__eeprom_write_misalign_check(mtd, 0x17, offset + 2, len); /* here mtd MUST crash because of overflow */
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 1, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 0, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset - 1, len);
 
   len = mtd.pagesize() * 2 - 1;
   offset = 0;
-  __eeprom_write_check(mtd, 0x17, offset + 0, len);
-  __eeprom_write_check(mtd, 0x17, offset + 1, len);
-  __eeprom_write_check(mtd, 0x17, offset + 2, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 0, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 1, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 2, len);
   offset = (mtd.pagecount() - 2) * mtd.pagesize();
-  //__eeprom_write_check(mtd, 0x17, offset + 2, len); /* here mtd MUST crash because of overflow */
-  __eeprom_write_check(mtd, 0x17, offset + 1, len);
-  __eeprom_write_check(mtd, 0x17, offset + 0, len);
-  __eeprom_write_check(mtd, 0x17, offset - 1, len);
+  //__eeprom_write_misalign_check(mtd, 0x17, offset + 2, len); /* here mtd MUST crash because of overflow */
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 1, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset + 0, len);
+  __eeprom_write_misalign_check(mtd, 0x17, offset - 1, len);
 }
 
 /*
@@ -293,29 +247,83 @@ static void file_addres_translate_test(Mtd &mtd) {
 /*
  *
  */
-static void erase_test(Mtd &mtd) {
-  const uint8_t watermark = 0xFF;
-  msg_t status;
-  size_t read_bytes;
+static void __eeprom_write_align_check(Mtd &mtd, uint8_t pattern, size_t pagenum) {
+  const size_t offset = mtd.pagesize() * pagenum;
+  const size_t N = mtd.pagesize();
+  size_t status;
 
-  status = mtd.erase();
-  osalDbgCheck(MSG_OK == status);
+  memset(refbuf, pattern, sizeof(refbuf));
 
-  read_bytes = mtd.read(filebuf, TEST_BUF_LEN, 0);
-  osalDbgCheck(read_bytes == TEST_BUF_LEN);
+  status = mtd.write(refbuf, N, offset);
+  osalDbgCheck(N == status);
 
-  memset(refbuf, watermark, TEST_BUF_LEN);
-  osalDbgCheck(0 == memcmp(refbuf, filebuf, TEST_BUF_LEN));
+  memset(mtdbuf, ~pattern, sizeof(refbuf));
+  status = mtd.read(mtdbuf, N, offset);
+  osalDbgCheck(N == status);
+
+  osalDbgCheck(0 == memcmp(refbuf, mtdbuf, N));
 }
 
+/*
+ *
+ */
+static void __eeprom_write_align_overlap_check(Mtd &mtd,
+                      uint8_t pattern1, uint8_t pattern2, size_t firstpage) {
 
+  const size_t offset = mtd.pagesize() * firstpage;
+  const size_t N = mtd.pagesize();
+  size_t status;
 
+  memset(refbuf, pattern1, N);
+  memset(refbuf + N, pattern2, N);
 
+  status = mtd.read(mtdbuf, 2 * N, offset);
+  osalDbgCheck(N == status);
 
+  osalDbgCheck(0 == memcmp(refbuf, mtdbuf, N));
+}
 
+/*
+ *
+ */
+static void eeprom_write_align_check(Mtd &mtd) {
 
+  __eeprom_write_align_check(mtd, 0xAA, 0);
+  __eeprom_write_align_check(mtd, 0x00, 0);
+  __eeprom_write_align_check(mtd, 0x55, 0);
+  __eeprom_write_align_check(mtd, 0xFF, 0);
+  __eeprom_write_align_check(mtd, 0x00, 1);
+  __eeprom_write_align_check(mtd, 0x55, 1);
+  __eeprom_write_align_check(mtd, 0xAA, 1);
+  __eeprom_write_align_check(mtd, 0xFF, 1);
 
+  __eeprom_write_align_check(mtd, 0x00, 0);
+  __eeprom_write_align_check(mtd, 0x55, 1);
+  __eeprom_write_align_overlap_check(mtd, 0x00, 0x55, 0);
+  __eeprom_write_align_check(mtd, 0xAA, 1);
+  __eeprom_write_align_check(mtd, 0x55, 0);
+  __eeprom_write_align_overlap_check(mtd, 0x55, 0xAA, 0);
 
+  __eeprom_write_align_check(mtd, 0x00, mtd.pagecount() - 1);
+  __eeprom_write_align_check(mtd, 0x55, mtd.pagecount() - 1);
+  __eeprom_write_align_check(mtd, 0xAA, mtd.pagecount() - 1);
+  __eeprom_write_align_check(mtd, 0xFF, mtd.pagecount() - 1);
+  __eeprom_write_align_check(mtd, 0x00, mtd.pagecount() - 2);
+  __eeprom_write_align_check(mtd, 0x55, mtd.pagecount() - 2);
+  __eeprom_write_align_check(mtd, 0xAA, mtd.pagecount() - 2);
+  __eeprom_write_align_check(mtd, 0xFF, mtd.pagecount() - 2);
+
+  __eeprom_write_align_check(mtd, 0x00, mtd.pagecount() - 1);
+  __eeprom_write_align_check(mtd, 0x55, mtd.pagecount() - 2);
+  __eeprom_write_align_overlap_check(mtd, 0x00, 0x55, mtd.pagecount() - 2);
+  __eeprom_write_align_check(mtd, 0xAA, mtd.pagecount() - 2);
+  __eeprom_write_align_check(mtd, 0x55, mtd.pagecount() - 1);
+  __eeprom_write_align_overlap_check(mtd, 0xAA, 0x55, mtd.pagecount() - 2);
+}
+
+/*
+ *
+ */
 static void fill_random(uint8_t *buf, size_t len) {
   size_t steps = len / sizeof(int);
   int *b = (int*)buf;
@@ -327,6 +335,9 @@ static void fill_random(uint8_t *buf, size_t len) {
   }
 }
 
+/*
+ *
+ */
 static void check_erased(Mtd &mtd) {
   size_t offset = 0;
   size_t write_steps = mtd.capacity() / TEST_BUF_LEN;
@@ -344,7 +355,10 @@ static void check_erased(Mtd &mtd) {
   }
 }
 
-static void fullwrite_erase(Mtd &mtd) {
+/*
+ *
+ */
+static void full_write_erase(Mtd &mtd) {
   int seed = chVTGetSystemTimeX();
   msg_t status;
   size_t write_steps = mtd.capacity() / TEST_BUF_LEN;
@@ -353,29 +367,22 @@ static void fullwrite_erase(Mtd &mtd) {
   osalDbgCheck(0 == mtd.capacity() % TEST_BUF_LEN);
   osalDbgCheck(write_steps > 0);
 
-  chTMObjectInit(&tm_mass_erase);
-  chTMObjectInit(&tm_full_write);
-  chTMObjectInit(&tm_full_read);
-
   /* fill with random data */
   srand(seed);
   offset = 0;
   bytes = 0;
-  chTMStartMeasurementX(&tm_full_write);
   for (size_t i=0; i<write_steps; i++) {
     fill_random(mtdbuf, TEST_BUF_LEN);
     bytes = mtd.write(mtdbuf, TEST_BUF_LEN, offset);
     osalDbgCheck(TEST_BUF_LEN == bytes);
     offset += bytes;
   }
-  chTMStopMeasurementX(&tm_full_write);
 
   /* read back and compare */
   srand(seed);
   offset = 0;
   bytes = 0;
   memset(mtdbuf, 0x55, TEST_BUF_LEN);
-  chTMStartMeasurementX(&tm_full_read);
   for (size_t i=0; i<write_steps; i++) {
     fill_random(refbuf, TEST_BUF_LEN);
     bytes = mtd.read(mtdbuf, TEST_BUF_LEN, offset);
@@ -383,12 +390,9 @@ static void fullwrite_erase(Mtd &mtd) {
     osalDbgCheck(0 == memcmp(refbuf, mtdbuf, TEST_BUF_LEN));
     offset += bytes;
   }
-  chTMStopMeasurementX(&tm_full_read);
 
   /* make clean */
-  chTMStartMeasurementX(&tm_mass_erase);
   status = mtd.erase();
-  chTMStopMeasurementX(&tm_mass_erase);
   osalDbgCheck(MSG_OK == status);
   check_erased(mtd);
 }
@@ -402,9 +406,20 @@ static void fullwrite_erase(Mtd &mtd) {
 /**
  *
  */
-void nvramTest(Mtd &mtd) {
-  fullwrite_erase(mtd);
+void nvramTestSuite(Mtd &mtd) {
+
+  full_write_erase(mtd);
+
+  if (mtd.pagecount() > 1) {
+    eeprom_write_align_check(mtd);
+  }
+
 }
+
+
+
+
+
 
 
 

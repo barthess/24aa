@@ -24,6 +24,6 @@
 
 #include "mtd.hpp"
 
-void nvramTest(nvram::Mtd &mtd);
+void nvramTestSuite(nvram::Mtd &mtd);
 
 #endif /* NVRAM_TEST_HPP_ */
