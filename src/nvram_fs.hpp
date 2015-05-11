@@ -22,6 +22,8 @@
 #ifndef NVRAM_FS_HPP_
 #define NVRAM_FS_HPP_
 
+#include <string.h>
+
 #include "mtd.hpp"
 #include "nvram_file.hpp"
 
@@ -38,7 +40,13 @@ namespace nvram {
 /**
  *
  */
-typedef struct {
+struct toc_item_t {
+  /**
+   * Default constructor.
+   */
+  toc_item_t(void) {
+    memset(this, 0, sizeof(*this));
+  }
   /**
    * NULL terminated string representing human readable name.
    */
@@ -51,7 +59,7 @@ typedef struct {
    * Size of file
    */
   uint16_t size;
-} toc_item_t;
+};
 
 /**
  *

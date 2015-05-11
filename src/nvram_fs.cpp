@@ -148,7 +148,6 @@ void Fs::open_super(void) {
  *
  */
 static bool check_name(const char *buf, size_t len) {
-
   int str_len = -1;
 
   /* check string length */
@@ -452,7 +451,7 @@ int Fs::find(const char *name, toc_item_t *ti){
 
   for (i=0; i<NVRAM_FS_MAX_FILE_CNT; i++){
     read_toc_item(ti, i);
-    if (0 == strcmp(name, ti->name)){
+    if (0 == strncmp(name, ti->name, NVRAM_FS_MAX_FILE_NAME_LEN)){
       return i;
     }
   }
