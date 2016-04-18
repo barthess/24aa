@@ -177,6 +177,8 @@ int main(void) {
   status = strcmp((const char *)read_back_buf, (const char *)test_string);
   osalDbgCheck(0 == status);
 
+  nvram_fs.close(f);
+
   nvram_power_off();
 
   while (TRUE){
