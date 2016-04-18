@@ -32,21 +32,6 @@
 #include "ch.hpp"
 
 /**
- * @name    Error codes
- * @{
- */
-/**
- * @brief   No error return code.
- */
-#define FILE_OK         0
-
-/**
- * @brief   Error code from the file stream methods.
- */
-#define FILE_ERROR      0xFFFFFFFFUL
-/** @} */
-
-/**
  * @brief   ChibiOS FS-related interfaces.
  */
 namespace chibios_fs {

@@ -13,17 +13,12 @@ EEPROM like a regular file(s).
 
 3. USAGE 
  
-Example of CPP code you can find in 'test_suite' directory. 
-
-Note! You have to provide functions mtd_led_on() and mtd_led_off()
-in your mtd_conf.h If you do not need such functionality just 
-define empty macros. 
+You can fine example project in 'test_app' directory. 
 
 4. LICENSE
 
 Actual code is published under the GPLv3 or later.
 Old unmaintainable code in 'legacy' directory published under BSD-3 license.
 
-
 Author: Uladzimir Pylinski aka barthess (barthess@yandex.ru). 
-01.09.2014
+18.04.2016

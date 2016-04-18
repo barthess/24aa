@@ -1,7 +1,7 @@
 /*
     Abstraction layer for EEPROM ICs.
 
-    Copyright (C) 2012,2013,2014 Uladzimir Pylinski aka barthess
+    Copyright (C) 2012..2016 Uladzimir Pylinski aka barthess
 
     This file is part of 24AA lib.
 

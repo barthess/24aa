@@ -80,46 +80,46 @@ endif
 PROJECT = ch
 
 # Imported source files and paths
-CHIBIOS = ../../chibios-svn
-include $(CHIBIOS)/os/hal/hal.mk
-include $(CHIBIOS)/os/hal/boards/NONSTANDARD_STM32F4_BARTHESS2/board.mk
-include $(CHIBIOS)/os/hal/ports/STM32/STM32F4xx/platform.mk
+CHIBIOS = ../../../../../ChibiOS-RT
+CHIBIOS_CONTRIB = $(CHIBIOS)/../ChibiOS-Contrib
+# Startup files.
+include $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC/mk/startup_stm32f4xx.mk
+# HAL-OSAL files (optional).
+include $(CHIBIOS_CONTRIB)/os/hal/hal.mk
+include $(CHIBIOS_CONTRIB)/os/hal/ports/STM32/STM32F4xx/platform.mk
+include $(CHIBIOS_CONTRIB)/os/hal/boards/NONSTANDARD_STM32F4_BARTHESS2/board.mk
 include $(CHIBIOS)/os/hal/osal/rt/osal.mk
+# RTOS files (optional).
 include $(CHIBIOS)/os/rt/rt.mk
-include $(CHIBIOS)/os/rt/ports/ARMCMx/compilers/GCC/mk/port_stm32f4xx.mk
-include $(CHIBIOS)/test/rt/test.mk
+include $(CHIBIOS)/os/common/ports/ARMCMx/compilers/GCC/mk/port_v7m.mk
+# other files
+include $(CHIBIOS)/os/various/cpp_wrappers/chcpp.mk
 
 # Define linker script file here
-LDSCRIPT= $(PORTLD)/STM32F407xG.ld
+LDSCRIPT= $(STARTUPLD)/STM32F407xG.ld
 
 # C sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
-CSRC = $(PORTSRC) \
+CSRC = $(STARTUPSRC) \
        $(KERNSRC) \
-       $(TESTSRC) \
-       $(HALSRC) \
+       $(PORTSRC) \
        $(OSALSRC) \
+       $(HALSRC) \
        $(PLATFORMSRC) \
        $(BOARDSRC) \
-       $(CHIBIOS)/os/various/devices_lib/accel/lis302dl.c \
-       $(CHIBIOS)/os/various/shell.c \
-       $(CHIBIOS)/os/various/chprintf.c \
-       $(CHIBIOS)/os/various/syscalls.c \
-
+       $(TESTSRC)
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
 NVRAMSRC = ../src
 
-CPPSRC = $(CHIBIOS)/os/various/cpp_wrappers/ch.cpp \
-         $(CHIBIOS)/os/various/cpp_wrappers/syscalls_cpp.cpp \
-         main.cpp \
-         test_nvram.cpp \
+CPPSRC = $(CHCPPSRC) \
+         $(NVRAMSRC)/mtd24.cpp \
          $(NVRAMSRC)/mtd.cpp \
-         $(NVRAMSRC)/eeprom_mtd.cpp \
-         $(NVRAMSRC)/fram_mtd.cpp \
          $(NVRAMSRC)/nvram_fs.cpp \
-         $(NVRAMSRC)/nvram_file.cpp
+         $(NVRAMSRC)/nvram_file.cpp \
+         $(NVRAMSRC)/nvram_test.cpp \
+         main.cpp
 
 # C sources to be compiled in ARM mode regardless of the global setting.
 # NOTE: Mixing ARM and THUMB mode enables the -mthumb-interwork compiler
@@ -142,15 +142,13 @@ TCSRC =
 TCPPSRC =
 
 # List ASM source files here
-ASMSRC = $(PORTASM)
+ASMSRC = $(STARTUPASM) $(PORTASM) $(OSALASM)
 
-INCDIR = $(PORTINC) $(KERNINC) $(TESTINC) \
-         $(HALINC) $(OSALINC) $(PLATFORMINC) $(BOARDINC) \
+INCDIR = $(STARTUPINC) $(KERNINC) $(PORTINC) $(OSALINC) \
+         $(HALINC) $(PLATFORMINC) $(BOARDINC) \
          $(CHIBIOS)/os/various \
          $(CHIBIOS)/os/various/cpp_wrappers \
-         board devices \
-         $(NVRAMSRC) \
-         ../test_suite
+         $(NVRAMSRC)
 
 #
 # Project, sources and paths
@@ -164,13 +162,8 @@ MCU  = cortex-m4
  
 #TRGT = arm-elf-
 TRGT = arm-none-eabi-
-ifeq ($(OS),Windows_NT) # workaround for crappy OS
-	CC   = $(TRGT)gcc
-	CPPC = $(TRGT)g++
-else
-	CC   = ccache $(TRGT)gcc
-	CPPC = ccache $(TRGT)g++
-endif
+CC   = $(TRGT)gcc
+CPPC = $(TRGT)g++
 
 # Enable loading with g++ only if you need C++ runtime support.
 # NOTE: You can use C++ even without C++ support if you are careful. C++
@@ -228,5 +221,5 @@ ULIBS = -lm
 # End of user defines
 ##############################################################################
 
-RULESPATH = $(CHIBIOS)/os/common/ports/ARMCMx/compilers/GCC
+RULESPATH = $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC
 include $(RULESPATH)/rules.mk

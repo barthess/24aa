@@ -1,7 +1,7 @@
 /*
     Abstraction layer for EEPROM ICs.
 
-    Copyright (C) 2012,2013,2014 Uladzimir Pylinski aka barthess
+    Copyright (C) 2012..2016 Uladzimir Pylinski aka barthess
 
     This file is part of 24AA lib.
 
@@ -27,13 +27,7 @@
 #include "mtd.hpp"
 #include "nvram_file.hpp"
 
-#if !defined(NVRAM_FS_MAX_FILE_NAME_LEN)
-#define NVRAM_FS_MAX_FILE_NAME_LEN        8
-#endif
-
-#if !defined(NVRAM_FS_MAX_FILE_CNT)
-#define NVRAM_FS_MAX_FILE_CNT             3
-#endif
+#include "nvram_fs_conf.h"
 
 namespace nvram {
 
