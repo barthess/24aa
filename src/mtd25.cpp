@@ -141,10 +141,13 @@ msg_t Mtd25::spi_write_enable(void) {
 msg_t Mtd25::spi_write(const uint8_t *txdata, size_t len,
                        uint8_t *writebuf, size_t preamble_len) {
 
-  memcpy(&writebuf[preamble_len], txdata, len);
+  if ((nullptr != txdata) && (len > 0)) {
+    memcpy(&writebuf[preamble_len], txdata, len);
+  }
 
-  if (MSG_OK != spi_write_enable())
+  if (MSG_OK != spi_write_enable()) {
     return MSG_RESET;
+  }
 
 #if SPI_USE_MUTUAL_EXCLUSION
   spiAcquireBus(this->spip);
