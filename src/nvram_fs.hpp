@@ -22,7 +22,7 @@
 #ifndef NVRAM_FS_HPP_
 #define NVRAM_FS_HPP_
 
-#include <string.h>
+#include <cstring>
 
 #include "mtd.hpp"
 #include "nvram_file.hpp"

@@ -45,14 +45,6 @@ public:
   msg_t put(uint8_t b);
   msg_t get(void);
 
-  template <typename T> size_t put(T data) {
-    return write(reinterpret_cast<uint8_t*>(&data), sizeof(T));
-  }
-
-  template <typename T> size_t get(T *datap) {
-    return read(reinterpret_cast<uint8_t*>(datap), sizeof(T));
-  }
-
 private:
   size_t clamp_size(size_t n);
   void close(void);
