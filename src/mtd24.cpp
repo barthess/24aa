@@ -33,11 +33,7 @@ namespace nvram {
  * DEFINES
  ******************************************************************************
  */
-#if defined(SAM7_PLATFORM)
-#define EEPROM_I2C_CLOCK (MCK / (((this->i2cp->config->cwgr & 0xFF) + ((this->cfg->i2cp->config->cwgr >> 8) & 0xFF)) * (1 << ((this->cfg->i2cp->config->cwgr >> 16) & 7)) + 6))
-#else
-#define EEPROM_I2C_CLOCK (this->i2cp->config->clock_speed)
-#endif
+
 /*
  ******************************************************************************
  * EXTERNS
@@ -66,13 +62,14 @@ namespace nvram {
 /**
  * @brief     Calculates requred timeout.
  */
-systime_t Mtd24::calc_timeout(size_t bytes) {
+static systime_t calc_timeout(size_t bytes, uint32_t clock) {
   const uint32_t bitsinbyte = 10;
-  uint32_t tmo;
-  tmo = ((bytes + 1) * bitsinbyte * 1000);
-  tmo /= EEPROM_I2C_CLOCK;
-  tmo += 10; /* some additional milliseconds to be safer */
-  return MS2ST(tmo);
+  uint32_t tmo_ms;
+
+  tmo_ms = ((bytes + 1) * bitsinbyte * 1000);
+  tmo_ms /= clock;
+  tmo_ms += 10; /* some additional milliseconds to be safer */
+  return MS2ST(tmo_ms);
 }
 
 /**
@@ -88,7 +85,7 @@ msg_t Mtd24::i2c_read(uint8_t *rxbuf, size_t len,
 #endif /* defined(STM32F1XX_I2C) */
 
   msg_t status;
-  systime_t tmo = calc_timeout(len + preamble_len);
+  systime_t tmo = calc_timeout(len + preamble_len, this->bus_clk);
   osalDbgCheck((nullptr != rxbuf) && (0 != len));
 
 #if I2C_USE_MUTUAL_EXCLUSION
@@ -120,7 +117,7 @@ msg_t Mtd24::i2c_write(const uint8_t *txdata, size_t len,
 #endif /* defined(STM32F1XX_I2C) */
 
   msg_t status;
-  systime_t tmo = calc_timeout(len + preamble_len);
+  systime_t tmo = calc_timeout(len + preamble_len, this->bus_clk);
 
   if ((nullptr != txdata) && (0 != len))
     memcpy(&writebuf[preamble_len], txdata, len);
@@ -254,7 +251,8 @@ Mtd24::Mtd24(const MtdConfig &cfg, uint8_t *writebuf, size_t writebuf_size,
                                             I2CDriver *i2cp, i2caddr_t addr) :
 Mtd(cfg, writebuf,  writebuf_size),
 i2cp(i2cp),
-addr(addr)
+addr(addr),
+bus_clk(cfg.bus_clk)
 {
   return;
 }

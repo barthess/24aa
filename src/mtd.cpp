@@ -60,7 +60,7 @@ namespace nvram {
  ******************************************************************************
  */
 /**
- * @brief   Split one uint16_t address to two uint8_t.
+ * @brief   Split multibyte address into uint8_t array.
  *
  * @param[in] txbuf pointer to driver transmit buffer
  * @param[in] addr  internal EEPROM device address
@@ -234,14 +234,15 @@ EXIT:
  */
 
 /* The rule of thumb for best performance write buffer:
- * 1) for EEPROM set it to size of your IC's page + ADDRESS_BYTES + command bytes
- * 2) for FRAM there is no such strict rule - chose it from 16..64 */
+ * 1) for EEPROM set it to size of your IC's page + ADDRESS_BYTES +
+ *    command bytes (if any).
+ * 2) for FRAM there is no such strict rule - good chose is 16..64 */
 Mtd::Mtd(const MtdConfig &cfg, uint8_t *writebuf, size_t writebuf_size) :
 cfg(cfg),
 writebuf(writebuf),
 writebuf_size(writebuf_size)
 #if (MTD_USE_MUTUAL_EXCLUSION && !CH_CFG_USE_MUTEXES)
-  ,semaphore(1)
+  ,semaphore(true)
 #endif
 {
   return;

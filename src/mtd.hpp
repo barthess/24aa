@@ -44,11 +44,13 @@ struct MtdConfig {
   /**
    * @brief   Time needed (worst case) by IC for single page writing.
    * @note    Set it to 0 for FRAM.
+   * @note    It is system ticks NOT milliseconds.
    */
   systime_t     programtime;
   /**
    * @brief   Time needed (worst case) by IC for full erase.
-   * @note    Set it to 0 for FRAM or for memory without hardware erase.
+   * @note    Set it to 0 for FRAM or for memory without auto-erase.
+   * @note    It is system ticks NOT milliseconds.
    */
   systime_t     erasetime;
   /**
@@ -65,6 +67,10 @@ struct MtdConfig {
    * @brief   Address length in bytes.
    */
   size_t        addr_len;
+  /**
+   * @brief   Bus clock in Hz for operation timeout calculation.
+   */
+  uint32_t      bus_clk;
   /**
    * @brief   Debug hooks. Set to nullptr if unused.
    */

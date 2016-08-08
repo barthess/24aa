@@ -34,7 +34,7 @@ namespace nvram {
 /**
  *
  */
-struct toc_item_t {
+struct __attribute__((packed)) toc_item_t {
   /**
    * Default constructor.
    */
