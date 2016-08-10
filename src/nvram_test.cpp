@@ -29,6 +29,7 @@
 
 #include "nvram_file.hpp"
 #include "nvram_fs.hpp"
+#include "nvram_test.hpp"
 
 using namespace nvram;
 
@@ -175,6 +176,22 @@ static void eeprom_write_misalign_check(Mtd &mtd) {
 /*
  *
  */
+template <typename T>
+static size_t _get(File *eef, T *ret) {
+  return eef->read(reinterpret_cast<uint8_t *>(ret), sizeof(T));
+}
+
+/*
+ *
+ */
+template <typename T>
+static size_t _put(File *eef, const T data) {
+  return eef->write(reinterpret_cast<const uint8_t *>(&data), sizeof(T));
+}
+
+/*
+ *
+ */
 static void file_test(File *eef) {
 
   const uint16_t u16 = 0x0102;
@@ -187,29 +204,29 @@ static void file_test(File *eef) {
   osalDbgCheck(NULL != eef);
 
   eef->setPosition(0);
-  osalDbgCheck(2 == eef->put(u16));
-  osalDbgCheck(4 == eef->put(u32));
-  osalDbgCheck(8 == eef->put(u64));
+  osalDbgCheck(2 == _put(eef, u16));
+  osalDbgCheck(4 == _put(eef, u32));
+  osalDbgCheck(8 == _put(eef, u64));
 
   eef->setPosition(0);
-  osalDbgCheck(2 == eef->get(&ret_u16));
+  osalDbgCheck(2 == _get(eef, &ret_u16));
   osalDbgCheck(ret_u16 == u16);
-  osalDbgCheck(4 == eef->get(&ret_u32));
+  osalDbgCheck(4 == _get(eef, &ret_u32));
   osalDbgCheck(ret_u32 == u32);
-  osalDbgCheck(8 == eef->get(&ret_u64));
+  osalDbgCheck(8 == _get(eef, &ret_u64));
   osalDbgCheck(ret_u64 == u64);
 
   eef->setPosition(0);
-  osalDbgCheck(8 == eef->put(u64));
-  osalDbgCheck(4 == eef->put(u32));
-  osalDbgCheck(2 == eef->put(u16));
+  osalDbgCheck(8 == _put(eef, u64));
+  osalDbgCheck(4 == _put(eef, u32));
+  osalDbgCheck(2 == _put(eef, u16));
 
   eef->setPosition(0);
-  osalDbgCheck(8 == eef->get(&ret_u64));
+  osalDbgCheck(8 == _get(eef, &ret_u64));
   osalDbgCheck(ret_u64 == u64);
-  osalDbgCheck(4 == eef->get(&ret_u32));
+  osalDbgCheck(4 == _get(eef, &ret_u32));
   osalDbgCheck(ret_u32 == u32);
-  osalDbgCheck(2 == eef->get(&ret_u16));
+  osalDbgCheck(2 == _get(eef, &ret_u16));
   osalDbgCheck(ret_u16 == u16);
 }
 
@@ -423,7 +440,14 @@ static void file_put_test(Mtd &mtd) {
 /*
  *
  */
-void nvramTestSuite(Mtd &mtd) {
+bool nvramTestSuite(Mtd &mtd) {
+
+  /* This test strictly depends on checks provided by ChibiOS. It is pointless
+     to run it without enabled debug checks. */
+#if CH_DBG_ENABLE_CHECKS != TRUE
+  return OSAL_FAILED;
+#endif
+
   size_t df, df2;
   size_t status;
   File *test0, *test1, *test2, *test3;
@@ -492,6 +516,8 @@ void nvramTestSuite(Mtd &mtd) {
   memset(mtdbuf, 0x55, sizeof(mtdbuf));
   status = mtd.read(mtdbuf, sizeof(mtdbuf), 0);
   osalDbgCheck(sizeof(mtdbuf) == status);
+
+  return OSAL_SUCCESS;
 }
 
 
