@@ -26,6 +26,7 @@
 
 #include "ch.hpp"
 #include "hal.h"
+#include "chprintf.h"
 
 #include "nvram_file.hpp"
 #include "nvram_fs.hpp"
@@ -38,7 +39,6 @@ using namespace nvram;
  * DEFINES
  ******************************************************************************
  */
-#define TEST_BUF_LEN    (1024 * 8)
 
 /*
  ******************************************************************************
@@ -57,9 +57,6 @@ using namespace nvram;
  * GLOBAL VARIABLES
  ******************************************************************************
  */
-static uint8_t mtdbuf[TEST_BUF_LEN];
-static uint8_t refbuf[TEST_BUF_LEN];
-static uint8_t filebuf[TEST_BUF_LEN];
 
 /*
  ******************************************************************************
@@ -72,105 +69,124 @@ static uint8_t filebuf[TEST_BUF_LEN];
 /*
  *
  */
-static void __eeprom_write_misalign_check(Mtd &mtd, uint8_t pattern, size_t offset, size_t len) {
-  msg_t status = MSG_RESET;
-
-  memset(refbuf, ~pattern, sizeof(refbuf));
-  memset(mtdbuf, ~pattern, sizeof(mtdbuf));
-  memset(filebuf, pattern, len);
-
-  /* write watermark */
-  status = mtd.write(refbuf, sizeof(refbuf), 0);
-  osalDbgCheck(MSG_OK == status);
-
-  /* write data */
-  status = mtd.write(filebuf, len, offset);
-  osalDbgCheck(MSG_OK == status);
-
-  /* read back */
-  status = mtd.read(mtdbuf, sizeof(mtdbuf), 0);
-  osalDbgCheck(MSG_OK == status);
-
-  /* prepare reference buffer */
-  memset(&refbuf[offset], pattern, len);
-
-  /* compare */
-  osalDbgCheck(0 == memcmp(refbuf, mtdbuf, sizeof(mtdbuf)));
+static void dbgprint(TestContext *ctx, const char *msg) {
+  if (nullptr != ctx->chn) {
+    chprintf(ctx->chn, msg);
+  }
 }
 
 /*
  *
  */
-static void eeprom_write_misalign_check(Mtd &mtd) {
-  size_t len;
-  size_t offset;
+static void __eeprom_write_misalign_check(TestContext *ctx, uint8_t pattern,
+                                          size_t offset, size_t len) {
+  size_t status = MSG_RESET;
+  Mtd *mtd = ctx->mtd;
+  uint8_t *mtdbuf = ctx->mtdbuf;
+  uint8_t *refbuf = ctx->refbuf;
+  uint8_t *filebuf = ctx->filebuf;
 
-  len = mtd.pagesize() + 1;
-  offset = 0;
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 0, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 1, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 2, len);
-  offset = mtd.pagesize();
-  __eeprom_write_misalign_check(mtd, 0x17, offset - 2, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset - 1, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 0, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 1, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 2, len);
-  offset = (mtd.pagecount() - 1) * mtd.pagesize();
-  //__eeprom_write_misalign_check(mtd, 0x17, offset - 0, len); /* here mtd MUST crash because of overflow */
-  __eeprom_write_misalign_check(mtd, 0x17, offset - 1, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset - 2, len);
+  memset(refbuf, ~pattern, ctx->len);
+  memset(mtdbuf, ~pattern, ctx->len);
+  memset(filebuf, pattern, len);
 
-  len = mtd.pagesize() + 2;
-  offset = 0;
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 0, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 1, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 2, len);
-  offset = mtd.pagesize();
-  __eeprom_write_misalign_check(mtd, 0x17, offset - 3, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset - 2, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset - 1, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 0, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 1, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 2, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 3, len);
-  offset = (mtd.pagecount() - 1) * mtd.pagesize();
-  //__eeprom_write_misalign_check(mtd, 0x17, offset - 0, len); /* here mtd MUST crash because of overflow */
-  //__eeprom_write_misalign_check(mtd, 0x17, offset - 1, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset - 2, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset - 3, len);
+  /* write watermark */
+  status = mtd->write(refbuf, ctx->len, 0);
+  osalDbgCheck(ctx->len == status);
 
-  len = mtd.pagesize() * 2 + 1;
-  offset = 0;
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 0, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 1, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 2, len);
-  offset = (mtd.pagecount() - 2) * mtd.pagesize();
-  //__eeprom_write_misalign_check(mtd, 0x17, offset - 0, len); /* here mtd MUST crash because of overflow */
-  __eeprom_write_misalign_check(mtd, 0x17, offset - 1, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset - 2, len);
+  /* write data */
+  status = mtd->write(filebuf, len, offset);
+  osalDbgCheck(len == status);
 
-  len = mtd.pagesize() - 1;
-  offset = 0;
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 0, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 1, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 2, len);
-  offset = (mtd.pagecount() - 1) * mtd.pagesize();
-  //__eeprom_write_misalign_check(mtd, 0x17, offset + 2, len); /* here mtd MUST crash because of overflow */
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 1, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 0, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset - 1, len);
+  /* read back */
+  status = mtd->read(mtdbuf, ctx->len, 0);
+  osalDbgCheck(ctx->len == status);
 
-  len = mtd.pagesize() * 2 - 1;
+  /* prepare reference buffer */
+  memset(&refbuf[offset], pattern, len);
+
+  /* compare */
+  osalDbgCheck(0 == memcmp(refbuf, mtdbuf, ctx->len));
+}
+
+/*
+ *
+ */
+static void eeprom_write_misalign_check(TestContext *ctx) {
+
+  const size_t pagesize = ctx->mtd->pagesize();
+  const size_t pagecnt = ctx->mtd->pagecount();
+  size_t offset = 0;
+  size_t len = ctx->mtd->pagesize() + 1;
+
+  dbgprint(ctx, "write misalign test ... ");
+
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 0, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 1, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 2, len);
+  offset = pagesize;
+  __eeprom_write_misalign_check(ctx, 0x17, offset - 2, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset - 1, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 0, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 1, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 2, len);
+  offset = (pagecnt - 1) * pagesize;
+  //__eeprom_write_misalign_check(ctx, 0x17, offset - 0, len); /* here mtd MUST crash because of overflow */
+  __eeprom_write_misalign_check(ctx, 0x17, offset - 1, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset - 2, len);
+
+  len = pagesize + 2;
   offset = 0;
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 0, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 1, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 2, len);
-  offset = (mtd.pagecount() - 2) * mtd.pagesize();
-  //__eeprom_write_misalign_check(mtd, 0x17, offset + 2, len); /* here mtd MUST crash because of overflow */
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 1, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset + 0, len);
-  __eeprom_write_misalign_check(mtd, 0x17, offset - 1, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 0, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 1, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 2, len);
+  offset = pagesize;
+  __eeprom_write_misalign_check(ctx, 0x17, offset - 3, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset - 2, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset - 1, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 0, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 1, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 2, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 3, len);
+  offset = (pagecnt - 1) * pagesize;
+  //__eeprom_write_misalign_check(ctx, 0x17, offset - 0, len); /* here mtd MUST crash because of overflow */
+  //__eeprom_write_misalign_check(ctx, 0x17, offset - 1, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset - 2, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset - 3, len);
+
+  len = pagesize * 2 + 1;
+  offset = 0;
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 0, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 1, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 2, len);
+  offset = (pagecnt - 2) * pagesize;
+  //__eeprom_write_misalign_check(ctx, 0x17, offset - 0, len); /* here mtd MUST crash because of overflow */
+  __eeprom_write_misalign_check(ctx, 0x17, offset - 1, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset - 2, len);
+
+  len = pagesize - 1;
+  offset = 0;
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 0, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 1, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 2, len);
+  offset = (pagecnt - 1) * pagesize;
+  //__eeprom_write_misalign_check(ctx, 0x17, offset + 2, len); /* here mtd MUST crash because of overflow */
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 1, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 0, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset - 1, len);
+
+  len = pagesize * 2 - 1;
+  offset = 0;
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 0, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 1, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 2, len);
+  offset = (pagecnt - 2) * pagesize;
+  //__eeprom_write_misalign_check(ctx, 0x17, offset + 2, len); /* here mtd MUST crash because of overflow */
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 1, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset + 0, len);
+  __eeprom_write_misalign_check(ctx, 0x17, offset - 1, len);
+
+  dbgprint(ctx, "OK\r\n");
 }
 
 /*
@@ -233,57 +249,69 @@ static void file_test(File *eef) {
 /*
  *
  */
-static void __file_addres_translate_test(Mtd &mtd, size_t writesize) {
+static void __file_addres_translate_test(TestContext *ctx, size_t writesize) {
   const uint8_t watermark = 0xFF;
   const uint8_t databyte = 'U';
   const size_t testoffset = 125;
+  Mtd *mtd = ctx->mtd;
+  uint8_t *mtdbuf = ctx->mtdbuf;
+  uint8_t *refbuf = ctx->refbuf;
+  uint8_t *filebuf = ctx->filebuf;
 
-  memset(mtdbuf, watermark, TEST_BUF_LEN);
-  mtd.write(mtdbuf, TEST_BUF_LEN, 0);
+  memset(mtdbuf, watermark, ctx->len);
+  mtd->write(mtdbuf, ctx->len, 0);
 
   File f;
-  f.__test_ctor(&mtd, testoffset, writesize * 2);
-  memset(mtdbuf, databyte, TEST_BUF_LEN);
+  f.__test_ctor(mtd, testoffset, writesize * 2);
+  memset(mtdbuf, databyte, ctx->len);
   f.write(mtdbuf, writesize);
 
   /* check */
-  memset(refbuf, watermark, TEST_BUF_LEN);
-  memset(refbuf+testoffset, databyte, writesize);
-  mtd.read(filebuf, TEST_BUF_LEN, 0);
-  osalDbgCheck(0 == memcmp(refbuf, filebuf, TEST_BUF_LEN));
+  memset(refbuf, watermark, ctx->len);
+  memset(refbuf + testoffset, databyte, writesize);
+  mtd->read(filebuf, ctx->len, 0);
+  osalDbgCheck(0 == memcmp(refbuf, filebuf, ctx->len));
 }
 
 /*
  *
  */
-static void addres_translate_test(Mtd &mtd) {
+static void addres_translate_test(TestContext *ctx) {
   uint32_t writesize;
 
-  if (mtd.pagecount() > 1)
-    writesize = mtd.pagesize();
+  dbgprint(ctx, "address translate test ... ");
+
+  if (ctx->mtd->pagecount() > 1)
+    writesize = ctx->mtd->pagesize();
   else
     writesize = 64;
 
-  __file_addres_translate_test(mtd, writesize);
-  __file_addres_translate_test(mtd, writesize - 1);
-  __file_addres_translate_test(mtd, writesize + 1);
+  __file_addres_translate_test(ctx, writesize);
+  __file_addres_translate_test(ctx, writesize - 1);
+  __file_addres_translate_test(ctx, writesize + 1);
+
+  dbgprint(ctx, "OK\r\n");
 }
 
 /*
  *
  */
-static void __eeprom_write_align_check(Mtd &mtd, uint8_t pattern, size_t pagenum) {
-  const size_t offset = mtd.pagesize() * pagenum;
-  const size_t N = mtd.pagesize();
+static void __eeprom_write_align_check(TestContext *ctx, uint8_t pattern, size_t pagenum) {
+
+  Mtd *mtd = ctx->mtd;
+  uint8_t *mtdbuf = ctx->mtdbuf;
+  uint8_t *refbuf = ctx->refbuf;
+  const size_t offset = mtd->pagesize() * pagenum;
+  const size_t N = mtd->pagesize();
   size_t status;
 
-  memset(refbuf, pattern, sizeof(refbuf));
+  memset(refbuf, pattern, ctx->len);
 
-  status = mtd.write(refbuf, N, offset);
+  status = mtd->write(refbuf, N, offset);
   osalDbgCheck(N == status);
 
-  memset(mtdbuf, ~pattern, sizeof(refbuf));
-  status = mtd.read(mtdbuf, N, offset);
+  memset(mtdbuf, ~pattern, ctx->len);
+  status = mtd->read(mtdbuf, N, offset);
   osalDbgCheck(N == status);
 
   osalDbgCheck(0 == memcmp(refbuf, mtdbuf, N));
@@ -292,18 +320,21 @@ static void __eeprom_write_align_check(Mtd &mtd, uint8_t pattern, size_t pagenum
 /*
  *
  */
-static void __eeprom_write_align_overlap_check(Mtd &mtd,
+static void __eeprom_write_align_overlap_check(TestContext *ctx,
                       uint8_t pattern1, uint8_t pattern2, size_t firstpage) {
+  Mtd *mtd = ctx->mtd;
+  uint8_t *mtdbuf = ctx->mtdbuf;
+  uint8_t *refbuf = ctx->refbuf;
 
-  const size_t offset = mtd.pagesize() * firstpage;
-  const size_t N = mtd.pagesize();
+  const size_t offset = mtd->pagesize() * firstpage;
+  const size_t N = mtd->pagesize();
   size_t status;
 
   memset(refbuf, pattern1, N);
   memset(refbuf + N, pattern2, N);
 
-  status = mtd.read(mtdbuf, 2 * N, offset);
-  osalDbgCheck(N == status);
+  status = mtd->read(mtdbuf, 2*N, offset);
+  osalDbgCheck(2*N == status);
 
   osalDbgCheck(0 == memcmp(refbuf, mtdbuf, N));
 }
@@ -311,39 +342,43 @@ static void __eeprom_write_align_overlap_check(Mtd &mtd,
 /*
  *
  */
-static void eeprom_write_align_check(Mtd &mtd) {
+static void eeprom_write_align_check(nvram::TestContext *ctx) {
+  Mtd *mtd = ctx->mtd;
+  dbgprint(ctx, "write align test ... ");
 
-  __eeprom_write_align_check(mtd, 0xAA, 0);
-  __eeprom_write_align_check(mtd, 0x00, 0);
-  __eeprom_write_align_check(mtd, 0x55, 0);
-  __eeprom_write_align_check(mtd, 0xFF, 0);
-  __eeprom_write_align_check(mtd, 0x00, 1);
-  __eeprom_write_align_check(mtd, 0x55, 1);
-  __eeprom_write_align_check(mtd, 0xAA, 1);
-  __eeprom_write_align_check(mtd, 0xFF, 1);
+  __eeprom_write_align_check(ctx, 0xAA, 0);
+  __eeprom_write_align_check(ctx, 0x00, 0);
+  __eeprom_write_align_check(ctx, 0x55, 0);
+  __eeprom_write_align_check(ctx, 0xFF, 0);
+  __eeprom_write_align_check(ctx, 0x00, 1);
+  __eeprom_write_align_check(ctx, 0x55, 1);
+  __eeprom_write_align_check(ctx, 0xAA, 1);
+  __eeprom_write_align_check(ctx, 0xFF, 1);
 
-  __eeprom_write_align_check(mtd, 0x00, 0);
-  __eeprom_write_align_check(mtd, 0x55, 1);
-  __eeprom_write_align_overlap_check(mtd, 0x00, 0x55, 0);
-  __eeprom_write_align_check(mtd, 0xAA, 1);
-  __eeprom_write_align_check(mtd, 0x55, 0);
-  __eeprom_write_align_overlap_check(mtd, 0x55, 0xAA, 0);
+  __eeprom_write_align_check(ctx, 0x00, 0);
+  __eeprom_write_align_check(ctx, 0x55, 1);
+  __eeprom_write_align_overlap_check(ctx, 0x00, 0x55, 0);
+  __eeprom_write_align_check(ctx, 0xAA, 1);
+  __eeprom_write_align_check(ctx, 0x55, 0);
+  __eeprom_write_align_overlap_check(ctx, 0x55, 0xAA, 0);
 
-  __eeprom_write_align_check(mtd, 0x00, mtd.pagecount() - 1);
-  __eeprom_write_align_check(mtd, 0x55, mtd.pagecount() - 1);
-  __eeprom_write_align_check(mtd, 0xAA, mtd.pagecount() - 1);
-  __eeprom_write_align_check(mtd, 0xFF, mtd.pagecount() - 1);
-  __eeprom_write_align_check(mtd, 0x00, mtd.pagecount() - 2);
-  __eeprom_write_align_check(mtd, 0x55, mtd.pagecount() - 2);
-  __eeprom_write_align_check(mtd, 0xAA, mtd.pagecount() - 2);
-  __eeprom_write_align_check(mtd, 0xFF, mtd.pagecount() - 2);
+  __eeprom_write_align_check(ctx, 0x00, mtd->pagecount() - 1);
+  __eeprom_write_align_check(ctx, 0x55, mtd->pagecount() - 1);
+  __eeprom_write_align_check(ctx, 0xAA, mtd->pagecount() - 1);
+  __eeprom_write_align_check(ctx, 0xFF, mtd->pagecount() - 1);
+  __eeprom_write_align_check(ctx, 0x00, mtd->pagecount() - 2);
+  __eeprom_write_align_check(ctx, 0x55, mtd->pagecount() - 2);
+  __eeprom_write_align_check(ctx, 0xAA, mtd->pagecount() - 2);
+  __eeprom_write_align_check(ctx, 0xFF, mtd->pagecount() - 2);
 
-  __eeprom_write_align_check(mtd, 0x00, mtd.pagecount() - 1);
-  __eeprom_write_align_check(mtd, 0x55, mtd.pagecount() - 2);
-  __eeprom_write_align_overlap_check(mtd, 0x00, 0x55, mtd.pagecount() - 2);
-  __eeprom_write_align_check(mtd, 0xAA, mtd.pagecount() - 2);
-  __eeprom_write_align_check(mtd, 0x55, mtd.pagecount() - 1);
-  __eeprom_write_align_overlap_check(mtd, 0xAA, 0x55, mtd.pagecount() - 2);
+  __eeprom_write_align_check(ctx, 0x55, mtd->pagecount() - 2);
+  __eeprom_write_align_check(ctx, 0x00, mtd->pagecount() - 1);
+  __eeprom_write_align_overlap_check(ctx, 0x55, 0x00, mtd->pagecount() - 2);
+  __eeprom_write_align_check(ctx, 0xAA, mtd->pagecount() - 2);
+  __eeprom_write_align_check(ctx, 0x55, mtd->pagecount() - 1);
+  __eeprom_write_align_overlap_check(ctx, 0xAA, 0x55, mtd->pagecount() - 2);
+
+  dbgprint(ctx, "OK\r\n");
 }
 
 /*
@@ -363,33 +398,41 @@ static void fill_random(uint8_t *buf, size_t len) {
 /*
  *
  */
-static void check_erased(Mtd &mtd) {
+static void check_erased(nvram::TestContext *ctx) {
+  Mtd *mtd = ctx->mtd;
+  uint8_t *mtdbuf = ctx->mtdbuf;
+  uint8_t *refbuf = ctx->refbuf;
   size_t offset = 0;
-  size_t write_steps = mtd.capacity() / TEST_BUF_LEN;
+  size_t write_steps = mtd->capacity() / ctx->len;
   uint32_t bytes;
 
   for (size_t i=0; i<write_steps; i++) {
-    memset(mtdbuf, 0x55, TEST_BUF_LEN);
-    memset(refbuf, 0xFF, TEST_BUF_LEN);
+    memset(mtdbuf, 0x55, ctx->len);
+    memset(refbuf, 0xFF, ctx->len);
 
-    bytes = mtd.read(mtdbuf, TEST_BUF_LEN, offset);
+    bytes = mtd->read(mtdbuf, ctx->len, offset);
     offset += bytes;
 
-    osalDbgCheck(TEST_BUF_LEN == bytes);
-    osalDbgCheck(0 == memcmp(refbuf, mtdbuf, TEST_BUF_LEN));
+    osalDbgCheck(ctx->len == bytes);
+    osalDbgCheck(0 == memcmp(refbuf, mtdbuf, ctx->len));
   }
 }
 
 /*
  *
  */
-static void full_write_erase(Mtd &mtd) {
+static void full_write_erase(nvram::TestContext *ctx) {
+  Mtd *mtd = ctx->mtd;
+  uint8_t *mtdbuf = ctx->mtdbuf;
+  uint8_t *refbuf = ctx->refbuf;
   int seed = chVTGetSystemTimeX();
   msg_t status;
-  size_t write_steps = mtd.capacity() / TEST_BUF_LEN;
+  size_t write_steps = mtd->capacity() / ctx->len;
   uint32_t offset, bytes;
 
-  osalDbgCheck(0 == mtd.capacity() % TEST_BUF_LEN);
+  dbgprint(ctx, "full write test ... ");
+
+  osalDbgCheck(0 == mtd->capacity() % ctx->len);
   osalDbgCheck(write_steps > 0);
 
   /* fill with random data */
@@ -397,9 +440,9 @@ static void full_write_erase(Mtd &mtd) {
   offset = 0;
   bytes = 0;
   for (size_t i=0; i<write_steps; i++) {
-    fill_random(mtdbuf, TEST_BUF_LEN);
-    bytes = mtd.write(mtdbuf, TEST_BUF_LEN, offset);
-    osalDbgCheck(TEST_BUF_LEN == bytes);
+    fill_random(mtdbuf, ctx->len);
+    bytes = mtd->write(mtdbuf, ctx->len, offset);
+    osalDbgCheck(ctx->len == bytes);
     offset += bytes;
   }
 
@@ -407,82 +450,84 @@ static void full_write_erase(Mtd &mtd) {
   srand(seed);
   offset = 0;
   bytes = 0;
-  memset(mtdbuf, 0x55, TEST_BUF_LEN);
+  memset(mtdbuf, 0x55, ctx->len);
   for (size_t i=0; i<write_steps; i++) {
-    fill_random(refbuf, TEST_BUF_LEN);
-    bytes = mtd.read(mtdbuf, TEST_BUF_LEN, offset);
-    osalDbgCheck(TEST_BUF_LEN == bytes);
-    osalDbgCheck(0 == memcmp(refbuf, mtdbuf, TEST_BUF_LEN));
+    fill_random(refbuf, ctx->len);
+    bytes = mtd->read(mtdbuf, ctx->len, offset);
+    osalDbgCheck(ctx->len == bytes);
+    osalDbgCheck(0 == memcmp(refbuf, mtdbuf, ctx->len));
     offset += bytes;
   }
 
   /* make clean */
-  status = mtd.erase();
+  status = mtd->erase();
   osalDbgCheck(MSG_OK == status);
-  check_erased(mtd);
+  check_erased(ctx);
+
+  dbgprint(ctx, "OK\r\n");
 }
 
 /*
  *
  */
-static void file_put_test(Mtd &mtd) {
+static void file_put_test(nvram::TestContext *ctx) {
+
   nvram::File f;
-  f.__test_ctor(&mtd, 0, mtd.capacity());
-  file_test(&f);
-}
 
-/*
- ******************************************************************************
- * EXPORTED FUNCTIONS
- ******************************************************************************
- */
+  dbgprint(ctx, "file put test ... ");
+
+  f.__test_ctor(ctx->mtd, 0, ctx->mtd->capacity());
+  file_test(&f);
+
+  dbgprint(ctx, "OK\r\n");
+}
 
 /*
  *
  */
-bool nvramTestSuite(Mtd &mtd) {
+void mkfs_and_mount_test(nvram::TestContext *ctx) {
 
-  /* This test strictly depends on checks provided by ChibiOS. It is pointless
-     to run it without enabled debug checks. */
-#if CH_DBG_ENABLE_CHECKS != TRUE
-  return OSAL_FAILED;
-#endif
+  Mtd *mtd = ctx->mtd;
+  Fs nvfs(*mtd);
 
-  size_t df, df2;
-  size_t status;
-  File *test0, *test1, *test2, *test3;
-
-  full_write_erase(mtd);
-
-  if (mtd.pagecount() > 1) {
-    eeprom_write_align_check(mtd);
-    eeprom_write_misalign_check(mtd);
-  }
-
-  addres_translate_test(mtd);
-
-  file_put_test(mtd);
-
-  mtd.erase();
-  Fs nvfs(mtd);
+  dbgprint(ctx, "mkfs and mount test ... ");
+  mtd->erase();
   osalDbgCheck(OSAL_FAILED  == nvfs.mount());
   osalDbgCheck(OSAL_FAILED  == nvfs.fsck());
   osalDbgCheck(OSAL_SUCCESS == nvfs.mkfs());
   osalDbgCheck(OSAL_SUCCESS == nvfs.fsck());
   osalDbgCheck(OSAL_SUCCESS == nvfs.mount());
+  dbgprint(ctx, "OK\r\n");
+}
+
+/*
+ *
+ */
+static void file_creation_test(nvram::TestContext *ctx) {
+
+  size_t df, df2;
+  size_t status;
+  File *test0, *test1, *test2, *test3;
+  Mtd *mtd = ctx->mtd;
+  uint8_t *mtdbuf = ctx->mtdbuf;
+  Fs nvfs(*mtd);
+
+  dbgprint(ctx, "file creation test ... ");
+
+  nvfs.mount();
 
   df = nvfs.df();
   test0 = nvfs.create("test0", 1024);
   osalDbgCheck(NULL != test0);
   df2 = nvfs.df();
   osalDbgCheck(df2 == (df - 1024));
-  memset(mtdbuf, 0x55, sizeof(mtdbuf));
-  status = mtd.read(mtdbuf, sizeof(mtdbuf), 0);
-  osalDbgCheck(sizeof(mtdbuf) == status);
+  memset(mtdbuf, 0x55, ctx->len);
+  status = mtd->read(mtdbuf, ctx->len, 0);
+  osalDbgCheck(ctx->len == status);
   file_test(test0);
-  memset(mtdbuf, 0x55, sizeof(mtdbuf));
-  status = mtd.read(mtdbuf, sizeof(mtdbuf), 0);
-  osalDbgCheck(sizeof(mtdbuf) == status);
+  memset(mtdbuf, 0x55, ctx->len);
+  status = mtd->read(mtdbuf, ctx->len, 0);
+  osalDbgCheck(ctx->len == status);
   nvfs.close(test0);
   test0 = nvfs.open("test0");
   osalDbgCheck(NULL != test0);
@@ -509,14 +554,58 @@ bool nvramTestSuite(Mtd &mtd) {
   nvfs.close(test1);
   nvfs.close(test2);
 
+  dbgprint(ctx, "OK\r\n");
+}
+
+/*
+ ******************************************************************************
+ * EXPORTED FUNCTIONS
+ ******************************************************************************
+ */
+
+/*
+ *
+ */
+bool nvram::TestSuite(TestContext *ctx) {
+
+  /* This test strictly depends on checks provided by ChibiOS. It is pointless
+     to run it without enabled debug checks. */
+#if CH_DBG_ENABLE_CHECKS != TRUE
+  return OSAL_FAILED;
+#endif
+
+  osalDbgCheck((nullptr != ctx->mtd) && (nullptr != ctx->mtdbuf)
+            && (nullptr != ctx->filebuf) && (nullptr != ctx->refbuf)
+            && (0 != ctx->len));
+
+  size_t status;
+  Mtd *mtd = ctx->mtd;
+  uint8_t *mtdbuf = ctx->mtdbuf;
+  Fs nvfs(*mtd);
+
+  full_write_erase(ctx);
+  if (mtd->pagecount() > 1) {
+    eeprom_write_align_check(ctx);
+    eeprom_write_misalign_check(ctx);
+  }
+  addres_translate_test(ctx);
+  file_put_test(ctx);
+  mkfs_and_mount_test(ctx);
+  file_creation_test(ctx);
+
+  dbgprint(ctx, "umount and fsck ... ");
   osalDbgCheck(OSAL_SUCCESS == nvfs.umount());
   osalDbgCheck(OSAL_SUCCESS == nvfs.fsck());
+  dbgprint(ctx, "OK\r\n");
 
   /*  now just read all data from NVRAM for eye check */
-  memset(mtdbuf, 0x55, sizeof(mtdbuf));
-  status = mtd.read(mtdbuf, sizeof(mtdbuf), 0);
-  osalDbgCheck(sizeof(mtdbuf) == status);
+  memset(mtdbuf, 0x55, ctx->len);
+  status = mtd->read(mtdbuf, ctx->len, 0);
+  osalDbgCheck(ctx->len == status);
 
+  /* make clean */
+  status = mtd->erase();
+  osalDbgCheck(MSG_OK == status);
   return OSAL_SUCCESS;
 }
 

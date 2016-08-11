@@ -173,35 +173,34 @@ static bool check_name(const char *buf, size_t len) {
  *
  */
 bool Fs::mkfs(void) {
-  uint8_t buf[sizeof(toc_item_t)];
   checksum_t sum = 0xFF; /* initial CRC vector */
   size_t written;
 
-  osalDbgCheck((this->files_opened == 0) && (NULL == super.mtd));
+  osalDbgCheck((this->files_opened == 0) && (nullptr == super.mtd));
   open_super();
   osalDbgAssert((super.start + super.size) < mtd.capacity(), "Overflow");
 
   /* write magic and zero file count */
-  memcpy(buf, magic, sizeof(magic));
-  buf[sizeof(magic)] = 0; /* existing files count */
+  memcpy(toc_buf, magic, sizeof(magic));
+  toc_buf[sizeof(magic)] = 0; /* existing files count */
   if (FILE_OK != super.setPosition(0))
     goto FAILED;
-  if (FAT_OFFSET != super.write(buf, FAT_OFFSET))
+  if (FAT_OFFSET != super.write(toc_buf, FAT_OFFSET))
     goto FAILED;
-  sum = nvramcrc(buf, FAT_OFFSET, sum);
+  sum = nvramcrc(toc_buf, FAT_OFFSET, sum);
 
   /* write empty FAT */
-  memset(buf, 0, sizeof(buf));
+  memset(toc_buf, 0, sizeof(toc_buf));
   for (size_t i=0; i<NVRAM_FS_MAX_FILE_CNT; i++){
-    written = super.write(buf, sizeof(buf));
-    if (sizeof(buf) != written)
+    written = super.write(toc_buf, sizeof(toc_buf));
+    if (sizeof(toc_buf) != written)
       goto FAILED;
-    sum = nvramcrc(buf, sizeof(buf), sum);
+    sum = nvramcrc(toc_buf, sizeof(toc_buf), sum);
   }
 
   /* seal superblock */
-  memcpy(buf, &sum, sizeof(checksum_t));
-  if (sizeof(checksum_t) != super.write(buf, sizeof(checksum_t)))
+  memcpy(toc_buf, &sum, sizeof(checksum_t));
+  if (sizeof(checksum_t) != super.write(toc_buf, sizeof(checksum_t)))
     goto FAILED;
 
   super.close();
@@ -245,21 +244,20 @@ checksum_t Fs::get_checksum(void){
  * @brief   Recalculate and write checksum
  */
 void Fs::seal(void){
-  uint8_t buf[sizeof(toc_item_t)];
   uint8_t sum = 0xFF;
   size_t status;
 
-  osalDbgCheck((this->files_opened > 0) && (NULL != super.mtd));
+  osalDbgCheck((this->files_opened > 0) && (nullptr != super.mtd));
 
   super.setPosition(0);
-  status = super.read(buf, FAT_OFFSET);
+  status = super.read(toc_buf, FAT_OFFSET);
   osalDbgCheck(FAT_OFFSET == status);
-  sum = nvramcrc(buf, FAT_OFFSET, sum);
+  sum = nvramcrc(toc_buf, FAT_OFFSET, sum);
 
   for (size_t i=0; i<NVRAM_FS_MAX_FILE_CNT; i++){
-    status = super.read(buf, sizeof(buf));
-    osalDbgCheck(sizeof(buf) == status);
-    sum = nvramcrc(buf, sizeof(buf), sum);
+    status = super.read(toc_buf, sizeof(toc_buf));
+    osalDbgCheck(sizeof(toc_buf) == status);
+    sum = nvramcrc(toc_buf, sizeof(toc_buf), sum);
   }
 
   /* store calculated sum */
@@ -334,7 +332,6 @@ void Fs::write_toc_item(const toc_item_t *ti, size_t N){
  */
 bool Fs::fsck(void) {
   fileoffset_t first_empty_byte;
-  uint8_t buf[sizeof(toc_item_t)];
   uint8_t sum = 0xFF;
   filecount_t exists;
   size_t status;
@@ -346,9 +343,9 @@ bool Fs::fsck(void) {
   open_super();
 
   /* check magic */
-  get_magic(buf);
-  sum = nvramcrc(buf, sizeof(magic), sum);
-  if (0 != memcmp(magic, buf, sizeof(magic)))
+  get_magic(toc_buf);
+  sum = nvramcrc(toc_buf, sizeof(magic), sum);
+  if (0 != memcmp(magic, toc_buf, sizeof(magic)))
     goto FAILED;
 
   /* check existing files number */
@@ -359,9 +356,9 @@ bool Fs::fsck(void) {
 
   /* verify check sum */
   for (size_t i=0; i<NVRAM_FS_MAX_FILE_CNT; i++){
-    status = super.read(buf, sizeof(buf));
-    osalDbgCheck(sizeof(buf) == status);
-    sum = nvramcrc(buf, sizeof(buf), sum);
+    status = super.read(toc_buf, sizeof(toc_buf));
+    osalDbgCheck(sizeof(toc_buf) == status);
+    sum = nvramcrc(toc_buf, sizeof(toc_buf), sum);
   }
   if (sum != get_checksum())
     goto FAILED;
@@ -470,21 +467,21 @@ File* Fs::create(const char *name, uint32_t size){
 
   /* zero size forbidden */
   if (0 == size)
-    return NULL;
+    return nullptr;
 
   file_cnt = get_file_cnt();
 
   /* check are we have spare slot for file */
   if (NVRAM_FS_MAX_FILE_CNT == file_cnt)
-    return NULL;
+    return nullptr;
 
   id = find(name, &ti);
   if (-1 != id)
-    return NULL; /* such file already exists */
+    return nullptr; /* such file already exists */
 
   /* check for name length */
   if (strlen(name) >= NVRAM_FS_MAX_FILE_NAME_LEN)
-    return NULL;
+    return nullptr;
 
   /* there is no such file. Lets create it*/
   strncpy(ti.name, name, NVRAM_FS_MAX_FILE_NAME_LEN);
@@ -498,7 +495,7 @@ File* Fs::create(const char *name, uint32_t size){
     ti.start = super.size + super.start;
 
   if ((ti.size + ti.start) > mtd.capacity())
-    return NULL;
+    return nullptr;
 
   /* */
   write_toc_item(&ti, file_cnt);
@@ -518,10 +515,10 @@ File* Fs::open(const char *name){
   id = find(name, &ti);
 
   if (-1 == id)
-    return NULL; /* not found */
+    return nullptr; /* not found */
 
   if (&mtd == fat[id].mtd)
-    return NULL; /* already opened */
+    return nullptr; /* already opened */
 
   fat[id].size = ti.size;
   fat[id].start = ti.start;
@@ -536,7 +533,7 @@ File* Fs::open(const char *name){
  */
 void Fs::close(File *file) {
 
-  osalDbgAssert(file != NULL, "null pointer reference");
+  osalDbgAssert(file != nullptr, "null pointer reference");
   if (!file)
     return;
   osalDbgAssert(this->files_opened > 0, "FS not mounted");

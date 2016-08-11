@@ -123,7 +123,7 @@ size_t File::clamp_size(size_t n){
  *
  */
 void File::close(void){
-  this->mtd = NULL;
+  this->mtd = nullptr;
   this->tip = 0;
   this->start = 0;
   this->size = 0;
@@ -133,7 +133,7 @@ void File::close(void){
  *
  */
 fileoffset_t File::getSize(void){
-  osalDbgAssert(NULL != this->mtd, "File not opened");
+  osalDbgAssert(nullptr != this->mtd, "File not opened");
   return size;
 }
 
@@ -141,7 +141,7 @@ fileoffset_t File::getSize(void){
  *
  */
 fileoffset_t File::getPosition(void){
-  osalDbgAssert(NULL != this->mtd, "File not opened");
+  osalDbgAssert(nullptr != this->mtd, "File not opened");
   return tip;
 }
 
@@ -149,7 +149,7 @@ fileoffset_t File::getPosition(void){
  *
  */
 uint32_t File::setPosition(uint32_t offset){
-  osalDbgAssert(NULL != this->mtd, "File not opened");
+  osalDbgAssert(nullptr != this->mtd, "File not opened");
 
   uint32_t size = getSize();
   if (offset >= size)
@@ -166,8 +166,8 @@ uint32_t File::setPosition(uint32_t offset){
 size_t File::read(uint8_t *buf, size_t n) {
   size_t acquired;
 
-  osalDbgAssert(NULL != this->mtd, "File not opened");
-  osalDbgCheck(NULL != buf);
+  osalDbgAssert(nullptr != this->mtd, "File not opened");
+  osalDbgCheck(nullptr != buf);
 
   n = clamp_size(n);
   if (0 == n)
@@ -185,8 +185,8 @@ size_t File::write(const uint8_t *buf, size_t n) {
 
   size_t written;
 
-  osalDbgAssert(NULL != this->mtd, "File not opened");
-  osalDbgCheck(NULL != buf);
+  osalDbgAssert(nullptr != this->mtd, "File not opened");
+  osalDbgCheck(nullptr != buf);
 
   n = clamp_size(n);
   if (0 == n)

@@ -92,6 +92,7 @@ private:
   Mtd &mtd;
   File super;
   File fat[NVRAM_FS_MAX_FILE_CNT];
+  uint8_t toc_buf[sizeof(toc_item_t)];
   /* Counter for opened files. In unmounted state this value must be 0.
    * After mounting it must be set to 1 denoting successful mount. Every
    * 'open' must increment it and every 'close' must decrement it. */

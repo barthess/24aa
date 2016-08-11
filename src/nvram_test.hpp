@@ -24,6 +24,22 @@
 
 #include "mtd.hpp"
 
-bool nvramTestSuite(nvram::Mtd &mtd);
+namespace nvram {
+
+/**
+ *
+ */
+struct TestContext {
+  nvram::Mtd            *mtd;
+  uint8_t               *mtdbuf;
+  uint8_t               *refbuf;
+  uint8_t               *filebuf;
+  size_t                len;      // length of buffers
+  BaseSequentialStream  *chn;     // debug output. Set to nullptr if unused
+};
+
+bool TestSuite(TestContext *ctx);
+
+} // namespace
 
 #endif /* NVRAM_TEST_HPP_ */
