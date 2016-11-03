@@ -22,7 +22,7 @@
 #ifndef NVRAM_TEST_HPP_
 #define NVRAM_TEST_HPP_
 
-#include "mtd.hpp"
+#include "mtd_base.hpp"
 
 namespace nvram {
 
@@ -30,7 +30,7 @@ namespace nvram {
  *
  */
 struct TestContext {
-  nvram::Mtd            *mtd;
+  nvram::MtdBase        *mtd;
   uint8_t               *mtdbuf;
   uint8_t               *refbuf;
   uint8_t               *filebuf;

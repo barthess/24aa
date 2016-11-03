@@ -19,8 +19,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef MTD24_HPP_
-#define MTD24_HPP_
+#ifndef MTD25_HPP_
+#define MTD25_HPP_
 
 #include "ch.hpp"
 #include "hal.h"
@@ -33,26 +33,21 @@ namespace nvram {
 /**
  *
  */
-class Mtd24 : public Mtd {
+class Mtd25 : public Mtd {
 public:
-  Mtd24(const MtdConfig &cfg, uint8_t *writebuf, size_t writebuf_size,
-                                      I2CDriver *i2cp, i2caddr_t addr);
+  Mtd25(const MtdConfig &cfg, uint8_t *writebuf, size_t writebuf_size, SPIDriver *spip);
 protected:
   size_t bus_write(const uint8_t *txdata, size_t len, uint32_t offset);
   size_t bus_read(uint8_t *rxbuf, size_t len, uint32_t offset);
   msg_t bus_erase(void);
 private:
-  void wait_op_complete(void);
-  msg_t i2c_read(uint8_t *rxbuf, size_t len,
+  msg_t spi_write_enable(void);
+  msg_t wait_op_complete(systime_t timeout);
+  msg_t spi_read(uint8_t *rxbuf, size_t len,
                  uint8_t *writebuf, size_t preamble_len);
-  msg_t i2c_write(const uint8_t *txdata, size_t len,
+  msg_t spi_write(const uint8_t *txdata, size_t len,
                   uint8_t *writebuf, size_t preamble_len);
-  msg_t stm32_f1x_read_single_byte(const uint8_t *txbuf, size_t txbytes,
-                                   uint8_t *rxbuf, systime_t tmo);
-  I2CDriver *i2cp;
-  i2caddr_t addr;
-  i2cflags_t i2cflags = 0;
-  uint32_t bus_clk;
+  SPIDriver *spip;
 };
 
 } /* namespace */

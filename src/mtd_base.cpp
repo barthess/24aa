@@ -24,7 +24,7 @@
 
 #include "ch.hpp"
 
-#include "mtd.hpp"
+#include "mtd_base.hpp"
 
 namespace nvram {
 
@@ -65,7 +65,7 @@ namespace nvram {
  * @param[in] txbuf pointer to driver transmit buffer
  * @param[in] addr  internal EEPROM device address
  */
-void Mtd::addr2buf(uint8_t *buf, uint32_t addr, size_t addr_len) {
+void MtdBase::addr2buf(uint8_t *buf, uint32_t addr, size_t addr_len) {
   osalDbgCheck(addr_len <= sizeof(addr));
 
   switch (addr_len) {
@@ -96,7 +96,7 @@ void Mtd::addr2buf(uint8_t *buf, uint32_t addr, size_t addr_len) {
 /**
  *
  */
-void Mtd::acquire(void) {
+void MtdBase::acquire(void) {
 #if MTD_USE_MUTUAL_EXCLUSION
   #if CH_CFG_USE_MUTEXES
     mutex.lock();
@@ -109,7 +109,7 @@ void Mtd::acquire(void) {
 /**
  *
  */
-void Mtd::release(void) {
+void MtdBase::release(void) {
 #if MTD_USE_MUTUAL_EXCLUSION
   #if CH_CFG_USE_MUTEXES
     mutex.unlock();
@@ -122,7 +122,7 @@ void Mtd::release(void) {
 /**
  *
  */
-size_t Mtd::fitted_write(const uint8_t *txdata, size_t len, uint32_t offset) {
+size_t MtdBase::fitted_write(const uint8_t *txdata, size_t len, uint32_t offset) {
 
   osalDbgAssert(len != 0, "something broken in higher level");
   osalDbgAssert((offset + len) <= (cfg.pages * cfg.pagesize),
@@ -136,7 +136,7 @@ size_t Mtd::fitted_write(const uint8_t *txdata, size_t len, uint32_t offset) {
 /**
  * @brief   Splits big transaction into smaller ones fitted into MTD's buffer.
  */
-size_t Mtd::split_by_buffer(const uint8_t *txdata, size_t len, uint32_t offset) {
+size_t MtdBase::split_by_buffer(const uint8_t *txdata, size_t len, uint32_t offset) {
   size_t written = 0;
   size_t tmp;
   const uint32_t blocksize = this->writebuf_size - cfg.addr_len;
@@ -169,7 +169,7 @@ EXIT:
 /**
  * @brief   Splits big transaction into smaller ones fitted into memory page.
  */
-size_t Mtd::split_by_page(const uint8_t *txdata, size_t len, uint32_t offset) {
+size_t MtdBase::split_by_page(const uint8_t *txdata, size_t len, uint32_t offset) {
 
   /* bytes to be written at one transaction */
   size_t L = 0;
@@ -237,7 +237,7 @@ EXIT:
  * 1) for EEPROM set it to size of your IC's page + ADDRESS_BYTES +
  *    command bytes (if any).
  * 2) for FRAM there is no such strict rule - good chose is 16..64 */
-Mtd::Mtd(const MtdConfig &cfg, uint8_t *writebuf, size_t writebuf_size) :
+MtdBase::MtdBase(const MtdConfig &cfg, uint8_t *writebuf, size_t writebuf_size) :
 cfg(cfg),
 writebuf(writebuf),
 writebuf_size(writebuf_size)
@@ -251,7 +251,7 @@ writebuf_size(writebuf_size)
 /**
  *
  */
-size_t Mtd::write(const uint8_t *data, size_t len, uint32_t offset) {
+size_t MtdBase::write(const uint8_t *data, size_t len, uint32_t offset) {
   size_t ret;
 
   if (nullptr != cfg.hook_start_write)
@@ -273,7 +273,7 @@ size_t Mtd::write(const uint8_t *data, size_t len, uint32_t offset) {
 /**
  *
  */
-size_t Mtd::read(uint8_t *rxbuf, size_t len, uint32_t offset) {
+size_t MtdBase::read(uint8_t *rxbuf, size_t len, uint32_t offset) {
   size_t ret;
 
   if (nullptr != cfg.hook_start_read)
@@ -290,7 +290,7 @@ size_t Mtd::read(uint8_t *rxbuf, size_t len, uint32_t offset) {
 /**
  *
  */
-msg_t Mtd::erase(void) {
+msg_t MtdBase::erase(void) {
   size_t ret;
 
   if (nullptr != cfg.hook_start_erase)

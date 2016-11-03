@@ -19,8 +19,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef MTD_HPP_
-#define MTD_HPP_
+#ifndef MTD_BASE_HPP_
+#define MTD_BASE_HPP_
 
 #include "ch.hpp"
 #include "hal.h"
@@ -33,9 +33,9 @@
 
 namespace nvram {
 
-class Mtd; /* forward declaration */
+class MtdBase; /* forward declaration */
 
-typedef void (*mtdcb_t)(Mtd *mtd);
+typedef void (*mtdcb_t)(MtdBase *mtd);
 
 /**
  *
@@ -85,9 +85,9 @@ struct MtdConfig {
 /**
  *
  */
-class Mtd {
+class MtdBase {
 public:
-  Mtd(const MtdConfig &cfg, uint8_t *writebuf, size_t writebuf_size);
+  MtdBase(const MtdConfig &cfg, uint8_t *writebuf, size_t writebuf_size);
   size_t write(const uint8_t *txdata, size_t len, uint32_t offset);
   size_t read(uint8_t *rxbuf, size_t len, uint32_t offset);
   msg_t erase(void);
@@ -122,4 +122,4 @@ protected:
 
 } /* namespace */
 
-#endif /* MTD_HPP_ */
+#endif /* MTD_BASE_HPP_ */

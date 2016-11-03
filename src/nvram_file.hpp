@@ -23,7 +23,7 @@
 #define NVRAM_FILE_HPP_
 
 #include "fs.hpp"
-#include "mtd.hpp"
+#include "mtd_base.hpp"
 
 namespace nvram {
 
@@ -34,7 +34,7 @@ class File : public chibios_fs::BaseFileStreamInterface {
   friend class Fs;
 public:
   File(void);
-  void __test_ctor(Mtd *mtd, uint32_t start, uint32_t size);
+  void __test_ctor(MtdBase *mtd, uint32_t start, uint32_t size);
   uint32_t getAndClearLastError(void);
   uint32_t getSize(void);
   uint32_t getPosition(void);
@@ -48,7 +48,7 @@ public:
 private:
   size_t clamp_size(size_t n);
   void close(void);
-  Mtd *mtd;
+  MtdBase *mtd;
   uint16_t start; /* file start in bytes relative to device start */
   uint16_t size;  /* size (bytes) */
   uint16_t tip;   /* current position in file (bytes) */

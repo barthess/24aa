@@ -394,7 +394,7 @@ FAILED:
 /**
  *
  */
-Fs::Fs(Mtd &mtd) :
+Fs::Fs(MtdBase &mtd) :
 mtd(mtd),
 files_opened(0)
 {

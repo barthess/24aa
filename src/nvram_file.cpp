@@ -100,7 +100,7 @@ mtd(nullptr), start(0), size(0), tip(0)
 /**
  * @brief     Special constructor for testing. Do not use it.
  */
-void File::__test_ctor(Mtd *mtd, fileoffset_t start, fileoffset_t size){
+void File::__test_ctor(MtdBase *mtd, fileoffset_t start, fileoffset_t size){
   this->mtd = mtd;
   this->tip = 0;
   this->start = start;

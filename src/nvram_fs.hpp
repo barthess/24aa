@@ -24,7 +24,7 @@
 
 #include <cstring>
 
-#include "mtd.hpp"
+#include "mtd_base.hpp"
 #include "nvram_file.hpp"
 
 #include "nvram_fs_conf.h"
@@ -70,7 +70,7 @@ typedef uint8_t checksum_t;
  */
 class Fs {
 public:
-  Fs(Mtd &mtd);
+  Fs(MtdBase &mtd);
   File *open(const char *name);
   void close(File *file);
   File *create(const char *name, uint32_t size);
@@ -89,7 +89,7 @@ private:
   void open_super(void);
   void seal(void);
   int find(const char *name, toc_item_t *ti);
-  Mtd &mtd;
+  MtdBase &mtd;
   File super;
   File fat[NVRAM_FS_MAX_FILE_CNT];
   uint8_t toc_buf[sizeof(toc_item_t)];

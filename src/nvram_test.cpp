@@ -81,7 +81,7 @@ static void dbgprint(TestContext *ctx, const char *msg) {
 static void __eeprom_write_misalign_check(TestContext *ctx, uint8_t pattern,
                                           size_t offset, size_t len) {
   size_t status = MSG_RESET;
-  Mtd *mtd = ctx->mtd;
+  MtdBase *mtd = ctx->mtd;
   uint8_t *mtdbuf = ctx->mtdbuf;
   uint8_t *refbuf = ctx->refbuf;
   uint8_t *filebuf = ctx->filebuf;
@@ -253,7 +253,7 @@ static void __file_addres_translate_test(TestContext *ctx, size_t writesize) {
   const uint8_t watermark = 0xFF;
   const uint8_t databyte = 'U';
   const size_t testoffset = 125;
-  Mtd *mtd = ctx->mtd;
+  MtdBase *mtd = ctx->mtd;
   uint8_t *mtdbuf = ctx->mtdbuf;
   uint8_t *refbuf = ctx->refbuf;
   uint8_t *filebuf = ctx->filebuf;
@@ -298,7 +298,7 @@ static void addres_translate_test(TestContext *ctx) {
  */
 static void __eeprom_write_align_check(TestContext *ctx, uint8_t pattern, size_t pagenum) {
 
-  Mtd *mtd = ctx->mtd;
+  MtdBase *mtd = ctx->mtd;
   uint8_t *mtdbuf = ctx->mtdbuf;
   uint8_t *refbuf = ctx->refbuf;
   const size_t offset = mtd->pagesize() * pagenum;
@@ -322,7 +322,7 @@ static void __eeprom_write_align_check(TestContext *ctx, uint8_t pattern, size_t
  */
 static void __eeprom_write_align_overlap_check(TestContext *ctx,
                       uint8_t pattern1, uint8_t pattern2, size_t firstpage) {
-  Mtd *mtd = ctx->mtd;
+  MtdBase *mtd = ctx->mtd;
   uint8_t *mtdbuf = ctx->mtdbuf;
   uint8_t *refbuf = ctx->refbuf;
 
@@ -343,7 +343,7 @@ static void __eeprom_write_align_overlap_check(TestContext *ctx,
  *
  */
 static void eeprom_write_align_check(nvram::TestContext *ctx) {
-  Mtd *mtd = ctx->mtd;
+  MtdBase *mtd = ctx->mtd;
   dbgprint(ctx, "write align test ... ");
 
   __eeprom_write_align_check(ctx, 0xAA, 0);
@@ -399,7 +399,7 @@ static void fill_random(uint8_t *buf, size_t len) {
  *
  */
 static void check_erased(nvram::TestContext *ctx) {
-  Mtd *mtd = ctx->mtd;
+  MtdBase *mtd = ctx->mtd;
   uint8_t *mtdbuf = ctx->mtdbuf;
   uint8_t *refbuf = ctx->refbuf;
   size_t offset = 0;
@@ -422,7 +422,7 @@ static void check_erased(nvram::TestContext *ctx) {
  *
  */
 static void full_write_erase(nvram::TestContext *ctx) {
-  Mtd *mtd = ctx->mtd;
+  MtdBase *mtd = ctx->mtd;
   uint8_t *mtdbuf = ctx->mtdbuf;
   uint8_t *refbuf = ctx->refbuf;
   int seed = chVTGetSystemTimeX();
@@ -487,7 +487,7 @@ static void file_put_test(nvram::TestContext *ctx) {
  */
 void mkfs_and_mount_test(nvram::TestContext *ctx) {
 
-  Mtd *mtd = ctx->mtd;
+  MtdBase *mtd = ctx->mtd;
   Fs nvfs(*mtd);
 
   dbgprint(ctx, "mkfs and mount test ... ");
@@ -508,7 +508,7 @@ static void file_creation_test(nvram::TestContext *ctx) {
   size_t df, df2;
   size_t status;
   File *test0, *test1, *test2, *test3;
-  Mtd *mtd = ctx->mtd;
+  MtdBase *mtd = ctx->mtd;
   uint8_t *mtdbuf = ctx->mtdbuf;
   Fs nvfs(*mtd);
 
@@ -579,7 +579,7 @@ bool nvram::TestSuite(TestContext *ctx) {
             && (0 != ctx->len));
 
   size_t status;
-  Mtd *mtd = ctx->mtd;
+  MtdBase *mtd = ctx->mtd;
   uint8_t *mtdbuf = ctx->mtdbuf;
   Fs nvfs(*mtd);
 

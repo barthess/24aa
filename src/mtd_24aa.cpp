@@ -24,7 +24,7 @@
 
 #include "ch.hpp"
 
-#include "mtd24.hpp"
+#include "mtd_24aa.hpp"
 
 namespace nvram {
 
@@ -75,7 +75,7 @@ static systime_t calc_timeout(size_t bytes, uint32_t clock) {
 /**
  *
  */
-msg_t Mtd24::i2c_read(uint8_t *rxbuf, size_t len,
+msg_t Mtd24aa::i2c_read(uint8_t *rxbuf, size_t len,
                    uint8_t *writebuf, size_t preamble_len) {
 
 #if defined(STM32F1XX_I2C)
@@ -107,7 +107,7 @@ msg_t Mtd24::i2c_read(uint8_t *rxbuf, size_t len,
 /**
  *
  */
-msg_t Mtd24::i2c_write(const uint8_t *txdata, size_t len,
+msg_t Mtd24aa::i2c_write(const uint8_t *txdata, size_t len,
                       uint8_t *writebuf, size_t preamble_len) {
 
 #if defined(STM32F1XX_I2C)
@@ -141,7 +141,7 @@ msg_t Mtd24::i2c_write(const uint8_t *txdata, size_t len,
 /**
  *
  */
-void Mtd24::wait_op_complete(void) {
+void Mtd24aa::wait_op_complete(void) {
   if (0 == cfg.programtime)
     return;
   else
@@ -153,7 +153,7 @@ void Mtd24::wait_op_complete(void) {
  * Stupid I2C cell in STM32F1x does not allow to read single byte.
  * So we must read 2 bytes and return needed one.
  */
-msg_t Mtd24::stm32_f1x_read_single_byte(const uint8_t *txbuf, size_t txbytes,
+msg_t Mtd24aa::stm32_f1x_read_single_byte(const uint8_t *txbuf, size_t txbytes,
                                          uint8_t *rxbuf, systime_t tmo) {
   uint8_t tmp[2];
   msg_t status;
@@ -169,7 +169,7 @@ msg_t Mtd24::stm32_f1x_read_single_byte(const uint8_t *txbuf, size_t txbytes,
  * @brief   Accepts data that can be fitted in single page boundary (for EEPROM)
  *          or can be placed in write buffer (for FRAM)
  */
-size_t Mtd24::bus_write(const uint8_t *txdata, size_t len, uint32_t offset) {
+size_t Mtd24aa::bus_write(const uint8_t *txdata, size_t len, uint32_t offset) {
   msg_t status;
 
   osalDbgCheck((this->writebuf_size - cfg.addr_len) >= len);
@@ -193,7 +193,7 @@ size_t Mtd24::bus_write(const uint8_t *txdata, size_t len, uint32_t offset) {
 /**
  *
  */
-size_t Mtd24::bus_read(uint8_t *rxbuf, size_t len, uint32_t offset) {
+size_t Mtd24aa::bus_read(uint8_t *rxbuf, size_t len, uint32_t offset) {
   msg_t status;
 
   osalDbgAssert((offset + len) <= capacity(), "Transaction out of device bounds");
@@ -213,7 +213,7 @@ size_t Mtd24::bus_read(uint8_t *rxbuf, size_t len, uint32_t offset) {
 /**
  *
  */
-msg_t Mtd24::bus_erase(void) {
+msg_t Mtd24aa::bus_erase(void) {
   msg_t status;
 
   this->acquire();
@@ -247,9 +247,9 @@ msg_t Mtd24::bus_erase(void) {
 /**
  *
  */
-Mtd24::Mtd24(const MtdConfig &cfg, uint8_t *writebuf, size_t writebuf_size,
+Mtd24aa::Mtd24aa(const MtdConfig &cfg, uint8_t *writebuf, size_t writebuf_size,
                                             I2CDriver *i2cp, i2caddr_t addr) :
-Mtd(cfg, writebuf,  writebuf_size),
+MtdBase(cfg, writebuf,  writebuf_size),
 i2cp(i2cp),
 addr(addr),
 bus_clk(cfg.bus_clk)
