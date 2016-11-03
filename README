@@ -1,15 +1,13 @@
-Abstraction layer for EEPROM ICs like 24AA/24LC.
+Abstraction layer for small capacity EEPROM ICs like 24AA/25AA.
 
 1. DESCRIPTION
 
 This library designed to work on top of ChibiOS/RT. It abstracts access to
-EEPROM like a regular file(s).
+EEPROM and FRAM like a regular file(s).
 
 2. LIMITATIONS
 
 * Supports only self erasable ICs.
-* Only I2C.
-* Maximum capacity of EEPROM is 65536 bytes.
 * No 'RAID' like combining
 
 3. USAGE 
@@ -18,8 +16,8 @@ You can fine example project in 'test_app' directory.
 
 4. LICENSE
 
-Actual code is published under the GPLv3 or later.
+Actual code is published under the Apache License, Version 2.0.
 Old unmaintainable code in 'legacy' directory published under BSD-3 license.
 
 Author: Uladzimir Pylinski aka barthess (barthess@yandex.ru). 
-18.04.2016
+03.11.2016
