@@ -172,6 +172,13 @@ static bool check_name(const char *buf, size_t len) {
 /**
  *
  */
+bool Fs::is_mounted(void) {
+  return (0 != this->files_opened);
+}
+
+/**
+ *
+ */
 bool Fs::mkfs(void) {
   checksum_t sum = 0xFF; /* initial CRC vector */
   size_t written;

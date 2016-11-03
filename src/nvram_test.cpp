@@ -421,6 +421,34 @@ static void check_erased(nvram::TestContext *ctx) {
 /*
  *
  */
+static msg_t nvramset(nvram::TestContext *ctx, int pattern) {
+
+  size_t psize;
+  size_t pages;
+
+  if (! ctx->mtd->is_fram()) {
+    psize = ctx->mtd->pagesize();
+    pages = ctx->mtd->pagecount();
+  }
+  else {
+    psize = 32;
+    pages = ctx->mtd->pagesize() / psize;
+  }
+
+  memset(ctx->mtdbuf, pattern, psize);
+
+  for (size_t i=0; i<pages; i++) {
+    if (psize != ctx->mtd->write(ctx->mtdbuf, psize, i*psize)) {
+      return MSG_RESET;
+    }
+  }
+
+  return MSG_OK;
+}
+
+/*
+ *
+ */
 static void full_write_erase(nvram::TestContext *ctx) {
   MtdBase *mtd = ctx->mtd;
   uint8_t *mtdbuf = ctx->mtdbuf;
@@ -460,7 +488,7 @@ static void full_write_erase(nvram::TestContext *ctx) {
   }
 
   /* make clean */
-  status = mtd->erase();
+  status = nvramset(ctx, 0xFF);
   osalDbgCheck(MSG_OK == status);
   check_erased(ctx);
 
@@ -491,7 +519,7 @@ void mkfs_and_mount_test(nvram::TestContext *ctx) {
   Fs nvfs(*mtd);
 
   dbgprint(ctx, "mkfs and mount test ... ");
-  mtd->erase();
+  nvramset(ctx, 0xFF);
   osalDbgCheck(OSAL_FAILED  == nvfs.mount());
   osalDbgCheck(OSAL_FAILED  == nvfs.fsck());
   osalDbgCheck(OSAL_SUCCESS == nvfs.mkfs());
@@ -604,7 +632,7 @@ bool nvram::TestSuite(TestContext *ctx) {
   osalDbgCheck(ctx->len == status);
 
   /* make clean */
-  status = mtd->erase();
+  status = nvramset(ctx, 0xFF);
   osalDbgCheck(MSG_OK == status);
   return OSAL_SUCCESS;
 }

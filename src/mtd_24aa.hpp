@@ -40,9 +40,8 @@ public:
 protected:
   size_t bus_write(const uint8_t *txdata, size_t len, uint32_t offset);
   size_t bus_read(uint8_t *rxbuf, size_t len, uint32_t offset);
-  msg_t bus_erase(void);
 private:
-  void wait_op_complete(void);
+  bool wait_op_complete(void);
   msg_t i2c_read(uint8_t *rxbuf, size_t len,
                  uint8_t *writebuf, size_t preamble_len);
   msg_t i2c_write(const uint8_t *txdata, size_t len,

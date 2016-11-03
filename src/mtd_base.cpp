@@ -74,18 +74,18 @@ void MtdBase::addr2buf(uint8_t *buf, uint32_t addr, size_t addr_len) {
     break;
   case 2:
     buf[0] = (addr >> 8) & 0xFF;
-    buf[1] = addr & 0xFF;
+    buf[1] =  addr       & 0xFF;
     break;
   case 3:
     buf[0] = (addr >> 16) & 0xFF;
-    buf[1] = (addr >> 8) & 0xFF;
-    buf[2] = addr & 0xFF;
+    buf[1] = (addr >> 8)  & 0xFF;
+    buf[2] =  addr        & 0xFF;
     break;
   case 4:
     buf[0] = (addr >> 24) & 0xFF;
     buf[1] = (addr >> 16) & 0xFF;
-    buf[2] = (addr >> 8) & 0xFF;
-    buf[3] = addr & 0xFF;
+    buf[2] = (addr >> 8)  & 0xFF;
+    buf[3] =  addr        & 0xFF;
     break;
   default:
     osalSysHalt("Incorrect address length");
@@ -168,6 +168,7 @@ EXIT:
 
 /**
  * @brief   Splits big transaction into smaller ones fitted into memory page.
+ * @return  Number of written bytes.
  */
 size_t MtdBase::split_by_page(const uint8_t *txdata, size_t len, uint32_t offset) {
 
@@ -233,10 +234,12 @@ EXIT:
  ******************************************************************************
  */
 
-/* The rule of thumb for best performance write buffer:
- * 1) for EEPROM set it to size of your IC's page + ADDRESS_BYTES +
- *    command bytes (if any).
- * 2) for FRAM there is no such strict rule - good chose is 16..64 */
+/*
+ * The rules of thumb for best performance write buffer.
+ * It must be big enough to store:
+ * 1) Size of your IC's page + ADDRESS_BYTES + command bytes (if any) for EEPROM.
+ * 2) for FRAM there is no such strict rule - good chose is 16..64
+ */
 MtdBase::MtdBase(const MtdConfig &cfg, uint8_t *writebuf, size_t writebuf_size) :
 cfg(cfg),
 writebuf(writebuf),
@@ -249,7 +252,7 @@ writebuf_size(writebuf_size)
 }
 
 /**
- *
+ * @return number of written bytes
  */
 size_t MtdBase::write(const uint8_t *data, size_t len, uint32_t offset) {
   size_t ret;
@@ -271,7 +274,7 @@ size_t MtdBase::write(const uint8_t *data, size_t len, uint32_t offset) {
 }
 
 /**
- *
+ * @return number of read bytes
  */
 size_t MtdBase::read(uint8_t *rxbuf, size_t len, uint32_t offset) {
   size_t ret;
@@ -290,18 +293,8 @@ size_t MtdBase::read(uint8_t *rxbuf, size_t len, uint32_t offset) {
 /**
  *
  */
-msg_t MtdBase::erase(void) {
-  size_t ret;
-
-  if (nullptr != cfg.hook_start_erase)
-    cfg.hook_start_erase(this);
-
-  ret = bus_erase();
-
-  if (nullptr != cfg.hook_stop_erase)
-    cfg.hook_stop_erase(this);
-
-  return ret;
+bool MtdBase::is_fram(void) {
+  return 0 == cfg.programtime;
 }
 
 } /* namespace */

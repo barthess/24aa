@@ -96,43 +96,6 @@ msg_t Mtd25aa::spi_read(uint8_t *rxbuf, size_t len,
 /**
  *
  */
-bool Mtd25aa::spi_write_enable(void) {
-  bool ret = OSAL_FAILED;
-  uint8_t tmp;
-
-#if SPI_USE_MUTUAL_EXCLUSION
-  spiAcquireBus(this->spip);
-#endif
-
-  /* try to enable write access */
-  spiSelect(spip);
-  spiPolledExchange(spip, CMD_25AA_WREN);
-  spiUnselect(spip);
-  osalThreadSleepMilliseconds(1);
-
-  /* check result */
-  spiSelect(spip);
-  spiPolledExchange(spip, CMD_25AA_RDSR);
-  tmp = spiPolledExchange(spip, 0);
-  spiUnselect(spip);
-  if (tmp & STATUS_25AA_WEL) {
-    this->wel = true;
-    ret = OSAL_SUCCESS;
-  }
-  else {
-    ret = OSAL_FAILED;
-  }
-
-#if SPI_USE_MUTUAL_EXCLUSION
-  spiReleaseBus(this->spip);
-#endif
-
-  return ret;
-}
-
-/**
- *
- */
 msg_t Mtd25aa::spi_write(const uint8_t *txdata, size_t len,
                          uint8_t *writebuf, size_t preamble_len) {
 
@@ -143,6 +106,10 @@ msg_t Mtd25aa::spi_write(const uint8_t *txdata, size_t len,
 #if SPI_USE_MUTUAL_EXCLUSION
   spiAcquireBus(this->spip);
 #endif
+
+  spiSelect(spip);
+  spiPolledExchange(spip, CMD_25AA_WREN);
+  spiUnselect(spip);
 
   spiSelect(spip);
   spiSend(spip, preamble_len + len, writebuf);
@@ -208,12 +175,6 @@ size_t Mtd25aa::bus_write(const uint8_t *txdata, size_t len, uint32_t offset) {
   /* fill preamble */
   writebuf[0] = CMD_25AA_WRITE;
   addr2buf(&writebuf[1], offset, cfg.addr_len);
-
-  if (! this->wel) {
-    if (OSAL_SUCCESS != spi_write_enable()) {
-      return 0;
-    }
-  }
   status = spi_write(txdata, len, writebuf, 1+cfg.addr_len);
 
   this->release();
@@ -261,8 +222,7 @@ size_t Mtd25aa::bus_read(uint8_t *rxbuf, size_t len, uint32_t offset) {
  */
 Mtd25aa::Mtd25aa(const MtdConfig &cfg, uint8_t *writebuf, size_t writebuf_size, SPIDriver *spip) :
 MtdBase(cfg, writebuf, writebuf_size),
-spip(spip),
-wel(false)
+spip(spip)
 {
   return;
 }

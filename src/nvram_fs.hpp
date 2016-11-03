@@ -75,6 +75,7 @@ public:
   void close(File *file);
   File *create(const char *name, uint32_t size);
   bool mount(void);
+  bool is_mounted(void);
   bool umount(void);
   bool mkfs(void);
   bool fsck(void);

@@ -90,14 +90,13 @@ public:
   MtdBase(const MtdConfig &cfg, uint8_t *writebuf, size_t writebuf_size);
   size_t write(const uint8_t *txdata, size_t len, uint32_t offset);
   size_t read(uint8_t *rxbuf, size_t len, uint32_t offset);
-  msg_t erase(void);
   uint32_t capacity(void) {return cfg.pages * cfg.pagesize;}
   uint32_t pagesize(void) {return cfg.pagesize;}
   uint32_t pagecount(void) {return cfg.pages;}
+  bool is_fram(void);
 protected:
   virtual size_t bus_write(const uint8_t *txdata, size_t len, uint32_t offset) = 0;
   virtual size_t bus_read(uint8_t *rxbuf, size_t len, uint32_t offset) = 0;
-  virtual msg_t bus_erase(void) = 0;
 
   size_t split_by_buffer(const uint8_t *txdata, size_t len, uint32_t offset);
   size_t split_by_page  (const uint8_t *txdata, size_t len, uint32_t offset);

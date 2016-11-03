@@ -141,11 +141,11 @@ msg_t Mtd24aa::i2c_write(const uint8_t *txdata, size_t len,
 /**
  *
  */
-void Mtd24aa::wait_op_complete(void) {
-  if (0 == cfg.programtime)
-    return;
-  else
+bool Mtd24aa::wait_op_complete(void) {
+  if (0 != cfg.programtime)
     osalThreadSleep(cfg.programtime);
+
+  return OSAL_SUCCESS;
 }
 
 /*
@@ -208,34 +208,6 @@ size_t Mtd24aa::bus_read(uint8_t *rxbuf, size_t len, uint32_t offset) {
     return len;
   else
     return 0;
-}
-
-/**
- *
- */
-msg_t Mtd24aa::bus_erase(void) {
-  msg_t status;
-
-  this->acquire();
-
-  size_t blocksize = (this->writebuf_size - cfg.addr_len);
-  size_t total_writes = capacity() / blocksize;
-
-  osalDbgAssert(0 == (capacity() % blocksize),
-      "Capacity must be divided by block size without remainder");
-
-  memset(writebuf, 0xFF, writebuf_size);
-  status = MSG_RESET;
-  for (size_t i=0; i<total_writes; i++) {
-    addr2buf(writebuf, i * blocksize, cfg.addr_len);
-    status = i2c_write(nullptr, 0, writebuf, this->writebuf_size);
-    wait_op_complete();
-    if (MSG_OK != status)
-      break;
-  }
-
-  this->release();
-  return status;
 }
 
 /*
