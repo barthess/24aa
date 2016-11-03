@@ -30,7 +30,7 @@
 
 #include "nvram_file.hpp"
 #include "nvram_fs.hpp"
-#include "nvram_test.hpp"
+#include "nvram_test_suite.hpp"
 
 using namespace nvram;
 

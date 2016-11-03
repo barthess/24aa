@@ -19,8 +19,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef NVRAM_TEST_HPP_
-#define NVRAM_TEST_HPP_
+#ifndef NVRAM_TEST_SUITE_HPP_
+#define NVRAM_TEST_SUITE_HPP_
 
 #include "mtd_base.hpp"
 
@@ -42,4 +42,4 @@ bool TestSuite(TestContext *ctx);
 
 } // namespace
 
-#endif /* NVRAM_TEST_HPP_ */
+#endif /* NVRAM_TEST_SUITE_HPP_ */
