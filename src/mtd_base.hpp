@@ -36,6 +36,8 @@ class MtdBase; /* forward declaration */
 
 typedef void (*mtdcb_t)(MtdBase *mtd);
 
+typedef void (*spiselect_t)(void);
+
 /**
  *
  */
@@ -70,6 +72,11 @@ struct MtdConfig {
    * @brief   Bus clock in Hz for operation timeout calculation.
    */
   uint32_t      bus_clk;
+  /**
+   * @brief   SPI Bus (un)select function pointer. Set to nullptr for I2C.
+   */
+  spiselect_t   spi_select;
+  spiselect_t   spi_unselect;
   /**
    * @brief   Debug hooks. Set to nullptr if unused.
    */

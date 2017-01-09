@@ -80,10 +80,10 @@ msg_t Mtd25aa::spi_read(uint8_t *rxbuf, size_t len,
 
   osalDbgCheck((nullptr != rxbuf) && (0 != len));
 
-  spiSelect(spip);
+  this->cfg.spi_select();
   spiSend(spip, preamble_len, writebuf);
   spiReceive(spip, len, rxbuf);
-  spiUnselect(spip);
+  this->cfg.spi_unselect();
 
 #if SPI_USE_MUTUAL_EXCLUSION
   spiReleaseBus(this->spip);
@@ -106,13 +106,13 @@ msg_t Mtd25aa::spi_write(const uint8_t *txdata, size_t len,
   spiAcquireBus(this->spip);
 #endif
 
-  spiSelect(spip);
+  this->cfg.spi_select();
   spiPolledExchange(spip, CMD_25AA_WREN);
-  spiUnselect(spip);
+  this->cfg.spi_unselect();
 
-  spiSelect(spip);
+  this->cfg.spi_select();
   spiSend(spip, preamble_len + len, writebuf);
-  spiUnselect(spip);
+  this->cfg.spi_unselect();
 
 #if SPI_USE_MUTUAL_EXCLUSION
   spiReleaseBus(this->spip);
@@ -141,10 +141,10 @@ bool Mtd25aa::wait_op_complete(void) {
     spiAcquireBus(this->spip);
 #endif
 
-    spiSelect(spip);
+    this->cfg.spi_select();
     spiPolledExchange(spip, CMD_25AA_RDSR);
     tmp = spiPolledExchange(spip, 0);
-    spiUnselect(spip);
+    this->cfg.spi_unselect();
 
     if (tmp & STATUS_25AA_WIP)
       ret = OSAL_FAILED;
